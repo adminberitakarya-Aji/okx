@@ -14,8 +14,8 @@ import httpx
 import pytest
 import tenacity
 
-from okx_trading.config.settings import BinanceSettings
-from okx_trading.infrastructure.binance.rest_client import BinanceAPIError, BinanceRestClient
+from trading_grid.config.settings import BinanceSettings
+from trading_grid.infrastructure.binance.rest_client import BinanceAPIError, BinanceRestClient
 
 
 def _make_settings(testnet: bool = True) -> BinanceSettings:

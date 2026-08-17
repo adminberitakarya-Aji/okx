@@ -11,10 +11,10 @@ import base64
 import hashlib
 import hmac
 
-from okx_trading.config.settings import BinanceSettings, BybitSettings, OKXSettings
-from okx_trading.infrastructure.binance.rest_client import BinanceRestClient
-from okx_trading.infrastructure.bybit.rest_client import RECV_WINDOW, BybitRestClient
-from okx_trading.infrastructure.okx.rest_client import OKXRestClient
+from trading_grid.config.settings import BinanceSettings, BybitSettings, OKXSettings
+from trading_grid.infrastructure.binance.rest_client import BinanceRestClient
+from trading_grid.infrastructure.bybit.rest_client import RECV_WINDOW, BybitRestClient
+from trading_grid.infrastructure.okx.rest_client import OKXRestClient
 
 # ---------------------------------------------------------------------------
 # OKX Signing

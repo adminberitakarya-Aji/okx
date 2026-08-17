@@ -14,26 +14,26 @@ from pathlib import Path
 
 import pytest
 
-from okx_trading.domain.market.models import Candle
-from okx_trading.research.ingestion.binance_client import (
+from trading_grid.domain.market.models import Candle
+from trading_grid.research.ingestion.binance_client import (
     BinanceDataError,
     BinanceHistoricalClient,
     BinanceIngestionStats,
     BinanceRateLimitError,
 )
-from okx_trading.research.ingestion.bybit_client import (
+from trading_grid.research.ingestion.bybit_client import (
     BybitDataError,
     BybitHistoricalClient,
     BybitIngestionStats,
     BybitRateLimitError,
 )
-from okx_trading.research.ingestion.okx_client import (
+from trading_grid.research.ingestion.okx_client import (
     IngestionStats,
     OKXDataError,
     OKXHistoricalClient,
     RateLimitError,
 )
-from okx_trading.research.ingestion.storage import DatasetMetadata, ParquetStorage
+from trading_grid.research.ingestion.storage import DatasetMetadata, ParquetStorage
 
 
 def make_candle(

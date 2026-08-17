@@ -12,11 +12,11 @@ from decimal import Decimal
 
 import pytest
 
-from okx_trading.research.features.grid_behavior import (
+from trading_grid.research.features.grid_behavior import (
     GridBehaviorAvailability,
     extract_grid_behavior_features,
 )
-from okx_trading.research.simulator.grid_simulator import (
+from trading_grid.research.simulator.grid_simulator import (
     EventType,
     SimulationConfig,
     SimulationEvent,

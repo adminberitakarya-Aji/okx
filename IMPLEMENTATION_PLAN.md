@@ -1,6 +1,6 @@
 # IMPLEMENTATION PLAN
 
-**Project:** OKX AI Trading Grid System
+**Project:** Trading Grid AI System
 **Version:** 1.0
 **Date:** 2026-08-15
 **Tech Stack:** Python-First (Modular Monolith)
@@ -79,10 +79,10 @@
 
 # 3. Project Structure
 
-> **Note:** This section reflects the actual codebase as of 2026-08-16 (Phase 4 complete).
+> **Note:** This section reflects the actual codebase as of 2026-08-17 (Phase 7 M7.1-M7.4 complete).
 
 ```
-OKX/
+TradingGrid/
 ├── pyproject.toml
 ├── uv.lock
 ├── README.md
@@ -99,7 +99,7 @@ OKX/
 ├── alembic/                        # Database migrations
 │   ├── env.py
 │   ├── script.py.mako
-│   └── versions/
+│   └── versions/                   # 6 migrations (0001 → sync_defaults)
 │
 ├── docs/                           # All specification documents
 │   ├── AI_RESEARCH.md
@@ -118,10 +118,26 @@ OKX/
 │   ├── TELEGRAM_GATEWAY_SPEC.md
 │   ├── SECURITY_AUTHORIZATION_SPEC.md
 │   ├── OKX_DEMO_TRADING_SPEC.md
-│   └── LIVE_TRADING_SPEC.md
+│   ├── LIVE_TRADING_SPEC.md
+│   ├── ML_TRAINING_PIPELINE_SPEC.md
+│   ├── ADMIN_DASHBOARD_SPEC.md
+│   └── DEPLOYMENT_PROXMOX.md
+│
+├── data/                           # Research data (gitignored)
+│   ├── pipeline_state.json         # ML pipeline state tracking
+│   └── research/
+│       ├── v1/BINANCE/             # Historical candles (9 markets, 1H)
+│       ├── features/               # Computed features (Parquet)
+│       ├── labels/                 # Generated labels (Parquet)
+│       └── dataset/                # Training dataset (Parquet)
+│
+├── models/                         # Trained ML models (gitignored)
+│   ├── model-*.pkl                 # 6 LightGBM models
+│   ├── model-*.meta.json           # Model metadata
+│   └── registry/index.json         # Model registry (DEPLOYED status)
 │
 ├── src/
-│   └── okx_trading/
+│   └── trading_grid/
 │       ├── __init__.py
 │       ├── py.typed
 │       │
@@ -140,6 +156,10 @@ OKX/
 │       │   ├── risk/
 │       │   │   ├── __init__.py
 │       │   │   └── models.py       # RiskLimits, RiskCheckResult
+│       │   ├── exchange/           # Exchange adapter interface
+│       │   │   ├── __init__.py
+│       │   │   ├── interface.py    # ExchangeAdapter ABC
+│       │   │   └── errors.py       # Exchange error types
 │       │   └── shared/
 │       │       ├── __init__.py
 │       │       ├── types.py        # Shared types
@@ -149,8 +169,10 @@ OKX/
 │       │   ├── __init__.py
 │       │   ├── ingestion/
 │       │   │   ├── __init__.py
-│       │   │   ├── okx_client.py   # Historical data download
-│       │   │   └── storage.py      # Parquet storage
+│       │   │   ├── okx_client.py       # OKX historical data download
+│       │   │   ├── binance_client.py   # Binance historical data download
+│       │   │   ├── bybit_client.py     # Bybit historical data download
+│       │   │   └── storage.py          # Parquet storage
 │       │   ├── features/
 │       │   │   ├── __init__.py
 │       │   │   ├── market_state.py         # F-MKT features
@@ -159,18 +181,19 @@ OKX/
 │       │   │   └── derived_ml.py           # F-ML features
 │       │   ├── simulator/
 │       │   │   ├── __init__.py
-│       │   │   └── grid_simulator.py  # Deterministic grid simulator
+│       │   │   └── grid_simulator.py   # Deterministic grid simulator
 │       │   ├── dataset/
 │       │   │   ├── __init__.py
-│       │   │   └── builder.py      # Dataset builder
+│       │   │   └── builder.py          # Dataset builder
 │       │   ├── labels/
 │       │   │   ├── __init__.py
-│       │   │   └── generator.py    # Label generator
+│       │   │   └── generator.py        # Label generator
 │       │   └── models/
 │       │       ├── __init__.py
-│       │       ├── trainer.py      # Model training
-│       │       ├── ranking.py      # Market ranking
-│       │       └── registry.py     # Model versioning
+│       │       ├── trainer.py              # Model training
+│       │       ├── ranking.py              # Market ranking
+│       │       ├── registry.py             # Model versioning
+│       │       └── blueprint_generator.py  # Blueprint generation
 │       │
 │       ├── application/            # Use cases / application services
 │       │   ├── __init__.py
@@ -180,22 +203,42 @@ OKX/
 │       │   │   └── __init__.py
 │       │   └── services/
 │       │       ├── __init__.py
-│       │       ├── authorization.py
-│       │       ├── approval.py
-│       │       ├── audit.py
-│       │       ├── user_service.py
-│       │       ├── grid_engine.py
-│       │       ├── execution_engine.py
-│       │       ├── demo_trading.py
-│       │       └── monitoring.py
+│       │       ├── authorization.py        # RBAC authorization
+│       │       ├── approval.py             # Approval workflow
+│       │       ├── audit.py                # Audit logging
+│       │       ├── user_service.py         # User management
+│       │       ├── grid_engine.py          # Grid state machine
+│       │       ├── execution_engine.py     # Order execution
+│       │       ├── demo_trading.py         # Demo trading service
+│       │       ├── monitoring.py           # Monitoring & alerts
+│       │       ├── price_monitor.py        # Price trigger service
+│       │       ├── research_service.py     # ML/heuristic ranking
+│       │       ├── credential_service.py   # Fernet credential encryption
+│       │       ├── exchange_factory.py     # Per-user adapter factory
+│       │       ├── tenant_limits.py        # Per-user rate/grid limits
+│       │       ├── risk_validation.py      # Risk validation service
+│       │       └── service_container.py    # DI container
 │       │
 │       ├── infrastructure/         # External integrations
 │       │   ├── __init__.py
+│       │   ├── exchange/
+│       │   │   ├── __init__.py
+│       │   │   └── symbols.py          # Market symbol normalization
 │       │   ├── okx/
 │       │   │   ├── __init__.py
 │       │   │   ├── rest_client.py      # OKX REST API
 │       │   │   ├── websocket_client.py # OKX WebSocket
 │       │   │   └── adapter.py          # OKXExchangeAdapter
+│       │   ├── binance/
+│       │   │   ├── __init__.py
+│       │   │   ├── rest_client.py      # Binance REST API
+│       │   │   ├── websocket_client.py # Binance WebSocket
+│       │   │   └── adapter.py          # BinanceExchangeAdapter
+│       │   ├── bybit/
+│       │   │   ├── __init__.py
+│       │   │   ├── rest_client.py      # Bybit REST API
+│       │   │   ├── websocket_client.py # Bybit WebSocket
+│       │   │   └── adapter.py          # BybitExchangeAdapter
 │       │   ├── telegram/
 │       │   │   ├── __init__.py
 │       │   │   ├── bot.py          # Telegram bot setup
@@ -216,9 +259,21 @@ OKX/
 │       │   ├── app.py              # FastAPI app factory
 │       │   ├── routes/
 │       │   │   ├── __init__.py
-│       │   │   ├── health.py
-│       │   │   ├── system.py
-│       │   │   └── demo.py
+│       │   │   ├── health.py       # Health check
+│       │   │   ├── system.py       # System status
+│       │   │   ├── demo.py         # Demo trading endpoints
+│       │   │   ├── account.py      # User account
+│       │   │   ├── approvals.py    # Approval workflow
+│       │   │   ├── blueprints.py   # Grid blueprints
+│       │   │   ├── grid.py         # Grid operations
+│       │   │   ├── markets.py      # Market data
+│       │   │   ├── orders.py       # Order management
+│       │   │   ├── pnl.py          # P&L reporting
+│       │   │   ├── positions.py    # Position tracking
+│       │   │   ├── research.py     # Research/ranking
+│       │   │   ├── risk.py         # Risk limits
+│       │   │   ├── simulations.py  # Grid simulation
+│       │   │   └── dependencies.py # Route dependencies
 │       │   ├── middleware/
 │       │   │   ├── __init__.py
 │       │   │   ├── auth.py         # Authentication middleware
@@ -229,7 +284,15 @@ OKX/
 │       │       ├── grid.py
 │       │       ├── research.py
 │       │       ├── system.py
-│       │       └── demo.py
+│       │       ├── demo.py
+│       │       ├── account.py
+│       │       ├── approvals.py
+│       │       ├── markets.py
+│       │       ├── orders.py
+│       │       ├── pnl.py
+│       │       ├── positions.py
+│       │       ├── risk.py
+│       │       └── simulations.py
 │       │
 │       ├── workers/                # Background workers (reserved, currently empty)
 │       │   └── __init__.py
@@ -248,13 +311,21 @@ OKX/
 │   │   └── config/
 │   ├── integration/
 │   │   ├── okx/
+│   │   ├── binance/
+│   │   ├── bybit/
 │   │   ├── database/
 │   │   └── api/
 │   └── e2e/
 │
 ├── scripts/
-│   ├── test_db_connection.py
-│   └── verify_tables.py
+│   ├── test_db_connection.py       # Database connectivity test
+│   ├── test_ws_connection.py       # WebSocket connectivity test
+│   ├── verify_tables.py            # Table verification
+│   ├── debug_features.py           # Feature debugging
+│   ├── run_telegram_bot.py         # Telegram bot runner
+│   ├── run_ml_training.py          # ML training orchestrator
+│   ├── run_ml_scheduler.py         # ML scheduled retraining
+│   └── deploy.sh                   # Deployment script
 │
 └── deploy/
     └── docker/
@@ -912,7 +983,7 @@ Development uses **Supabase** (cloud PostgreSQL) and **no Redis**.
 ```bash
 # Clone repository
 git clone <repo-url>
-cd okx-trading
+cd trading-grid
 
 # Install uv (if not installed)
 # Windows: powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
@@ -966,7 +1037,7 @@ APP_SECRET_KEY=change-me
 DATABASE_URL=postgresql+asyncpg://postgres:password@db.xxxxx.supabase.co:5432/postgres
 
 # Database (Production: VPS)
-# DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/okx_trading
+# DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/trading_grid
 
 # Redis (Phase 3+ only, not needed for Phase 0-2)
 # REDIS_URL=redis://localhost:6379/0
@@ -1006,7 +1077,7 @@ test-integration:
 	uv run pytest tests/integration
 
 test-coverage:
-	uv run pytest --cov=okx_trading --cov-report=html
+	uv run pytest --cov=trading_grid --cov-report=html
 
 lint:
 	uv run ruff check src tests
@@ -1018,7 +1089,7 @@ typecheck:
 	uv run mypy src
 
 dev:
-	uv run uvicorn okx_trading.api.app:create_app --factory --reload
+	uv run uvicorn trading_grid.api.app:create_app --factory --reload
 
 migrate:
 	uv run alembic upgrade head
@@ -1060,7 +1131,7 @@ services:
     image: timescale/timescaledb:latest-pg15
     restart: unless-stopped
     environment:
-      POSTGRES_DB: okx_trading
+      POSTGRES_DB: trading_grid
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
@@ -1090,8 +1161,8 @@ curl -fsSL https://get.docker.com | sh
 apt-get install -y docker-compose
 
 # Clone repository
-git clone <repo-url> /opt/okx-trading
-cd /opt/okx-trading
+git clone <repo-url> /opt/trading-grid
+cd /opt/trading-grid
 
 # Configure environment
 cp .env.example .env

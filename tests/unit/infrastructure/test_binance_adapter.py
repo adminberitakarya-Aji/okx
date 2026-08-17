@@ -5,10 +5,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from okx_trading.config.settings import BinanceSettings
-from okx_trading.domain.execution.models import Order
-from okx_trading.infrastructure.binance.adapter import BinanceAdapter
-from okx_trading.infrastructure.binance.rest_client import BinanceAPIError
+from trading_grid.config.settings import BinanceSettings
+from trading_grid.domain.execution.models import Order
+from trading_grid.infrastructure.binance.adapter import BinanceAdapter
+from trading_grid.infrastructure.binance.rest_client import BinanceAPIError
 
 
 def _make_settings(testnet=True):
@@ -73,13 +73,13 @@ class TestBinanceAdapterConnection:
 class TestBinanceAdapterWebSocket:
     async def test_start_market_data_ws(self):
         adapter = _make_adapter()
-        with patch("okx_trading.infrastructure.binance.adapter.BinanceWebSocketClient") as mock_ws:
+        with patch("trading_grid.infrastructure.binance.adapter.BinanceWebSocketClient") as mock_ws:
             await adapter.start_market_data_ws()
             mock_ws.assert_called_once()
 
     async def test_start_private_ws(self):
         adapter = _make_adapter()
-        with patch("okx_trading.infrastructure.binance.adapter.BinanceWebSocketClient") as mock_ws:
+        with patch("trading_grid.infrastructure.binance.adapter.BinanceWebSocketClient") as mock_ws:
             await adapter.start_private_ws()
             mock_ws.assert_called_once()
 

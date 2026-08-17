@@ -16,22 +16,22 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from okx_trading.application.services.exchange_factory import (
+from trading_grid.application.services.exchange_factory import (
     SUPPORTED_EXCHANGES,
     ExchangeAdapterFactory,
     create_exchange_adapter,
     get_configured_exchanges,
 )
-from okx_trading.config.settings import (
+from trading_grid.config.settings import (
     BinanceSettings,
     BybitSettings,
     OKXSettings,
     Settings,
 )
-from okx_trading.domain.exchange.errors import ExchangeNotConfiguredError
-from okx_trading.infrastructure.binance.adapter import BinanceAdapter
-from okx_trading.infrastructure.bybit.adapter import BybitAdapter
-from okx_trading.infrastructure.okx.adapter import OKXAdapter
+from trading_grid.domain.exchange.errors import ExchangeNotConfiguredError
+from trading_grid.infrastructure.binance.adapter import BinanceAdapter
+from trading_grid.infrastructure.bybit.adapter import BybitAdapter
+from trading_grid.infrastructure.okx.adapter import OKXAdapter
 
 
 def make_settings(
@@ -314,7 +314,7 @@ class TestCreateForUser:
         """Build a mock CredentialService returning the given credential."""
         service = AsyncMock()
         if cred is None:
-            from okx_trading.application.services.credential_service import (
+            from trading_grid.application.services.credential_service import (
                 CredentialNotFoundError,
             )
 
@@ -430,7 +430,7 @@ class TestCreateForUser:
     @pytest.mark.asyncio
     async def test_missing_credential_propagates_not_found(self) -> None:
         """create_for_user propagates CredentialNotFoundError from service."""
-        from okx_trading.application.services.credential_service import (
+        from trading_grid.application.services.credential_service import (
             CredentialNotFoundError,
         )
 

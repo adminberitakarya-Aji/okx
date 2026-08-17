@@ -16,14 +16,14 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from cryptography.fernet import Fernet
 
-from okx_trading.application.services.credential_service import (
+from trading_grid.application.services.credential_service import (
     CredentialEncryptionError,
     CredentialNotConfiguredError,
     CredentialNotFoundError,
     CredentialService,
     DecryptedCredential,
 )
-from okx_trading.config.settings import CredentialSettings, Settings
+from trading_grid.config.settings import CredentialSettings, Settings
 
 
 def make_settings(encryption_key: str | None = None) -> Settings:
@@ -353,7 +353,7 @@ class TestStoreCredential:
         )
 
         # Find the UserCredentialModel that was added
-        from okx_trading.infrastructure.database.models import UserCredentialModel
+        from trading_grid.infrastructure.database.models import UserCredentialModel
 
         cred_models = [o for o in added_objects if isinstance(o, UserCredentialModel)]
         assert len(cred_models) == 1
@@ -401,7 +401,7 @@ class TestGetCredential:
     @pytest.mark.asyncio
     async def test_get_credential_decrypts_correctly(self) -> None:
         """get_credential returns decrypted values."""
-        from okx_trading.infrastructure.database.models import UserCredentialModel
+        from trading_grid.infrastructure.database.models import UserCredentialModel
 
         # Create a mock credential model with encrypted data
         mock_cred = MagicMock(spec=UserCredentialModel)
@@ -461,7 +461,7 @@ class TestRevokeCredential:
     @pytest.mark.asyncio
     async def test_revoke_existing_returns_true(self) -> None:
         """Revoking an existing credential returns True and sets status."""
-        from okx_trading.infrastructure.database.models import UserCredentialModel
+        from trading_grid.infrastructure.database.models import UserCredentialModel
 
         mock_cred = MagicMock(spec=UserCredentialModel)
         mock_cred.credential_id = "cred_abc123"

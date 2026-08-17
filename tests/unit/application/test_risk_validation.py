@@ -15,11 +15,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from okx_trading.application.services.execution_engine import ExecutionEngine
-from okx_trading.application.services.risk_validation import RiskValidationService
-from okx_trading.domain.execution.models import Position
-from okx_trading.domain.risk.models import PortfolioRisk, RiskLimits
-from okx_trading.infrastructure.okx.adapter import OKXAdapter
+from trading_grid.application.services.execution_engine import ExecutionEngine
+from trading_grid.application.services.risk_validation import RiskValidationService
+from trading_grid.domain.execution.models import Position
+from trading_grid.domain.risk.models import PortfolioRisk, RiskLimits
+from trading_grid.infrastructure.okx.adapter import OKXAdapter
 
 
 def make_limits(**overrides: object) -> RiskLimits:

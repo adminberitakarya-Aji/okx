@@ -16,14 +16,14 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from okx_trading.application.services.grid_engine import GridEngine, GridRuntime
-from okx_trading.application.services.price_monitor import (
+from trading_grid.application.services.grid_engine import GridEngine, GridRuntime
+from trading_grid.application.services.price_monitor import (
     DEFAULT_LEVEL_COOLDOWN_SECONDS,
     GridMonitorState,
     LevelTriggerState,
     PriceMonitorService,
 )
-from okx_trading.domain.grid.models import Blueprint, CalculatedGridPrices, GridLevelModel, Section
+from trading_grid.domain.grid.models import Blueprint, CalculatedGridPrices, GridLevelModel, Section
 
 # ---------------------------------------------------------------------------
 # Fixtures

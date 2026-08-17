@@ -11,7 +11,7 @@ from decimal import Decimal
 
 import pytest
 
-from okx_trading.domain.grid.calculator import (
+from trading_grid.domain.grid.calculator import (
     calculate_capital_per_grid,
     calculate_grid_prices,
     calculate_section_capital,
@@ -20,8 +20,8 @@ from okx_trading.domain.grid.calculator import (
     verify_geometric_spacing,
     verify_uniform_spacing,
 )
-from okx_trading.domain.grid.models import Blueprint, Section
-from okx_trading.domain.shared.errors import BlueprintValidationError
+from trading_grid.domain.grid.models import Blueprint, Section
+from trading_grid.domain.shared.errors import BlueprintValidationError
 
 
 def create_test_blueprint() -> Blueprint:

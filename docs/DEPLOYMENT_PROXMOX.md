@@ -1,4 +1,4 @@
-# DEPLOYMENT PROXMOX — OKX AI Trading Grid System
+# DEPLOYMENT PROXMOX — Trading Grid AI System
 
 Panduan lengkap untuk deploy sistem ke **Proxmox home server** menggunakan **LXC container** dengan **Ubuntu 24.04 LTS**.
 
@@ -11,7 +11,7 @@ Panduan lengkap untuk deploy sistem ke **Proxmox home server** menggunakan **LXC
 │              PROXMOX HOME SERVER                │
 │                                                 │
 │  ┌───────────────────────────────────────────┐  │
-│  │  LXC: "okx-trading" (Ubuntu 24.04)        │  │
+│  │  LXC: "trading-grid" (Ubuntu 24.04)        │  │
 │  │                                           │  │
 │  │  Docker Compose:                          │  │
 │  │  ┌─────────────┐  ┌─────────────┐        │  │
@@ -72,7 +72,7 @@ pveam list local
 ```bash
 # Buat container ID 105
 pct create 105 local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst \
-  --hostname okx-trading \
+  --hostname trading-grid \
   --cores 2 \
   --memory 2048 \
   --swap 512 \
@@ -256,7 +256,7 @@ docker compose -f deploy/docker/docker-compose.prod.yml ps
 curl http://localhost:8000/health
 
 # 3. Cek log telegram bot
-docker logs -f okx-trading-telegram
+docker logs -f trading-grid-telegram
 
 # 4. Test bot di Telegram
 # Buka @gridtrade6_bot → /start
@@ -273,10 +273,10 @@ docker logs -f okx-trading-telegram
 docker compose --env-file /opt/okx/.env -f deploy/docker/docker-compose.prod.yml logs -f
 
 # Telegram bot saja
-docker logs -f okx-trading-telegram
+docker logs -f trading-grid-telegram
 
 # API saja
-docker logs -f okx-trading-app
+docker logs -f trading-grid-app
 ```
 
 ### Restart
@@ -286,7 +286,7 @@ docker logs -f okx-trading-app
 docker compose --env-file /opt/okx/.env -f deploy/docker/docker-compose.prod.yml restart
 
 # Restart telegram bot saja
-docker restart okx-trading-telegram
+docker restart trading-grid-telegram
 ```
 
 ### Update
@@ -354,7 +354,7 @@ Edit `deploy/docker/docker-compose.prod.yml`:
 2. **Uncomment** volume `pgdata`
 3. **Update** `DATABASE_URL` di semua services:
    ```yaml
-   - DATABASE_URL=postgresql+asyncpg://${DB_USER:-okx_user}:${DB_PASSWORD}@db:5432/${DB_NAME:-okx_trading}
+   - DATABASE_URL=postgresql+asyncpg://${DB_USER:-okx_user}:${DB_PASSWORD}@db:5432/${DB_NAME:-trading_grid}
    ```
 
 ### 9.3 Buat init-db.sql
@@ -367,8 +367,8 @@ nano deploy/docker/init-db.sql
 ```sql
 -- init-db.sql
 CREATE USER okx_user WITH PASSWORD 'your-strong-password';
-CREATE DATABASE okx_trading OWNER okx_user;
-GRANT ALL PRIVILEGES ON DATABASE okx_trading TO okx_user;
+CREATE DATABASE trading_grid OWNER okx_user;
+GRANT ALL PRIVILEGES ON DATABASE trading_grid TO okx_user;
 ```
 
 ### 9.4 Import Data
@@ -378,7 +378,7 @@ GRANT ALL PRIVILEGES ON DATABASE okx_trading TO okx_user;
 docker compose --env-file /opt/okx/.env -f deploy/docker/docker-compose.prod.yml up -d db
 
 # Import data
-docker exec -i okx-trading-db psql -U okx_user okx_trading < /backup/supabase_dump.sql
+docker exec -i trading-grid-db psql -U okx_user trading_grid < /backup/supabase_dump.sql
 
 # Restart semua services
 docker compose --env-file /opt/okx/.env -f deploy/docker/docker-compose.prod.yml up -d
@@ -391,7 +391,7 @@ docker compose --env-file /opt/okx/.env -f deploy/docker/docker-compose.prod.yml
 crontab -e
 
 # Tambah backup harian jam 2 pagi
-0 2 * * * docker exec okx-trading-db pg_dump -U okx_user okx_trading | gzip > /backup/okx_$(date +\%Y\%m\%d).sql.gz
+0 2 * * * docker exec trading-grid-db pg_dump -U okx_user trading_grid | gzip > /backup/okx_$(date +\%Y\%m\%d).sql.gz
 
 # Retensi 7 hari
 0 3 * * * find /backup -name "*.sql.gz" -mtime +7 -delete
@@ -405,7 +405,7 @@ crontab -e
 
 ```bash
 # Cek log
-docker logs -f okx-trading-telegram
+docker logs -f trading-grid-telegram
 
 # Cek token valid
 # Test manual: curl https://api.telegram.org/bot<TOKEN>/getMe
@@ -415,10 +415,10 @@ docker logs -f okx-trading-telegram
 
 ```bash
 # Cek container status
-docker ps | grep okx-trading-app
+docker ps | grep trading-grid-app
 
 # Cek log
-docker logs okx-trading-app
+docker logs trading-grid-app
 
 # Cek health
 curl http://localhost:8000/health
@@ -438,10 +438,10 @@ grep DATABASE_URL .env
 
 ```bash
 # Cek log detail
-docker logs --tail 100 okx-trading-app
+docker logs --tail 100 trading-grid-app
 
 # Cek environment
-docker inspect okx-trading-app | grep -A5 Environment
+docker inspect trading-grid-app | grep -A5 Environment
 ```
 
 ### DNS ISP memblokir api.binance.com / api.bybit.com (Indonesia)

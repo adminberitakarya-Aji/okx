@@ -13,13 +13,13 @@ from decimal import Decimal
 
 import pytest
 
-from okx_trading.application.services.tenant_limits import (
+from trading_grid.application.services.tenant_limits import (
     MaxGridsExceededError,
     RateLimitExceededError,
     TenantLimitsService,
     UserEmergencyStoppedError,
 )
-from okx_trading.config.settings import Settings
+from trading_grid.config.settings import Settings
 
 
 @pytest.fixture

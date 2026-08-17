@@ -13,11 +13,11 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from okx_trading.config.settings import get_settings
-from okx_trading.infrastructure.database.base import Base
+from trading_grid.config.settings import get_settings
 
 # Import all models so Alembic can detect them
-from okx_trading.infrastructure.database import models  # noqa: F401
+from trading_grid.infrastructure.database import models  # noqa: F401
+from trading_grid.infrastructure.database.base import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

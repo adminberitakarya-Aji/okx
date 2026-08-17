@@ -12,8 +12,8 @@ from decimal import Decimal
 
 from sqlalchemy import inspect
 
-from okx_trading.infrastructure.database.base import Base
-from okx_trading.infrastructure.database.models import (
+from trading_grid.infrastructure.database.base import Base
+from trading_grid.infrastructure.database.models import (
     AuditLogModel,
     BlueprintModel,
     FillModel,

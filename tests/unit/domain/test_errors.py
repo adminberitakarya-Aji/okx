@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from okx_trading.domain.shared.errors import (
+from trading_grid.domain.shared.errors import (
     AmbiguousOrderStateError,
     ApprovalRequiredError,
     BlueprintValidationError,

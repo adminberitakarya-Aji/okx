@@ -11,11 +11,11 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from okx_trading.config.settings import BinanceSettings
-from okx_trading.domain.execution.models import Order
-from okx_trading.infrastructure.binance.adapter import BinanceAdapter
-from okx_trading.infrastructure.binance.rest_client import BinanceAPIError
-from okx_trading.infrastructure.exchange.symbols import (
+from trading_grid.config.settings import BinanceSettings
+from trading_grid.domain.execution.models import Order
+from trading_grid.infrastructure.binance.adapter import BinanceAdapter
+from trading_grid.infrastructure.binance.rest_client import BinanceAPIError
+from trading_grid.infrastructure.exchange.symbols import (
     to_concatenated_symbol,
     to_normalized_market_id,
 )

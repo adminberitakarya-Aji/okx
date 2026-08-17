@@ -19,7 +19,7 @@ Parent Documents:
 
 # 1. Purpose
 
-This document defines the end-to-end ML training pipeline for the OKX AI Trading Grid System.
+This document defines the end-to-end ML training pipeline for the Trading Grid AI System.
 
 The ML training pipeline is responsible for:
 
@@ -145,7 +145,7 @@ Production Inference
 
 | Data Type | Source | Interval | Minimum History |
 |-----------|--------|----------|-----------------|
-| Candles (OHLCV) | OKX/Binance/Bybit API | 1H (primary), 1D (regime) | 6 months (ideal: 1-2 years) |
+| Candles (OHLCV) | TradingGrid/Binance/Bybit API | 1H (primary), 1D (regime) | 6 months (ideal: 1-2 years) |
 | Order Book Snapshots | Exchange API | Periodic snapshots | 3 months |
 | Ticker Data | Exchange API | Real-time + historical | 6 months |
 | Market Metadata | Exchange API | Static + updates | Current |
@@ -160,7 +160,7 @@ Storage: ~1-5 GB (Parquet, compressed)
 
 ## 4.3 Ingestion Clients
 
-Located in `src/okx_trading/research/ingestion/`:
+Located in `src/trading_grid/research/ingestion/`:
 
 | File | Purpose |
 |------|---------|
@@ -195,7 +195,7 @@ BYBIT_TESTNET_MODE=true
 
 ## 5.1 Feature Categories
 
-Located in `src/okx_trading/research/features/`:
+Located in `src/trading_grid/research/features/`:
 
 | Category | File | Example Features |
 |----------|------|------------------|
@@ -221,7 +221,7 @@ Total features per observation: **~60+ features**
 
 # 6. Blueprint Generation
 
-Located in `src/okx_trading/research/models/blueprint_generator.py`
+Located in `src/trading_grid/research/models/blueprint_generator.py`
 
 For each market at each observation time, generate candidate Grid Blueprints:
 
@@ -240,7 +240,7 @@ Candidate Blueprints:
 
 # 7. Grid Simulation
 
-Located in `src/okx_trading/research/simulator/grid_simulator.py`
+Located in `src/trading_grid/research/simulator/grid_simulator.py`
 
 The Grid Simulator runs deterministic simulations:
 
@@ -264,7 +264,7 @@ Simulation Results:
 
 # 8. Label Generation
 
-Located in `src/okx_trading/research/labels/generator.py`
+Located in `src/trading_grid/research/labels/generator.py`
 
 ## 8.1 Label Types
 
@@ -295,7 +295,7 @@ Outcome → Label
 
 # 9. Dataset Building
 
-Located in `src/okx_trading/research/dataset/builder.py`
+Located in `src/trading_grid/research/dataset/builder.py`
 
 ## 9.1 Dataset Row Structure
 
@@ -343,7 +343,7 @@ dataset_version = "dataset-v001"
 
 # 10. Model Training
 
-Located in `src/okx_trading/research/models/trainer.py`
+Located in `src/trading_grid/research/models/trainer.py`
 
 ## 10.1 Models to Train
 
@@ -422,7 +422,7 @@ Aggregate: Mean ± Std of metrics across folds
 
 # 11. Model Registry
 
-Located in `src/okx_trading/research/models/registry.py`
+Located in `src/trading_grid/research/models/registry.py`
 
 ## 11.1 Model Lifecycle
 
@@ -533,31 +533,53 @@ Usage:
     uv run python scripts/run_ml_training.py --full      # Full pipeline
     uv run python scripts/run_ml_training.py --ingest    # Data ingestion only
     uv run python scripts/run_ml_training.py --features  # Feature engineering only
+    uv run python scripts/run_ml_training.py --simulate  # Simulation & labels only
     uv run python scripts/run_ml_training.py --train     # Model training only
     uv run python scripts/run_ml_training.py --evaluate  # Evaluation only
     uv run python scripts/run_ml_training.py --promote   # Promote model
+    uv run python scripts/run_ml_training.py --status    # Show pipeline status
+    uv run python scripts/run_ml_training.py --force     # Force promote (skip quality gate)
+
+Options:
+    --exchange OKX|BINANCE|BYBIT   # Data source (default: OKX)
+    --markets BTC-USDT,ETH-USDT    # Comma-separated market list
+    --months 6                     # Historical data period
 ```
 
-**Status:** Script to be implemented (see IMPLEMENTATION_PLAN.md)
+**Status:** ✅ Implemented (2026-08-17). See IMPLEMENTATION_PLAN.md Phase 7.
+
+Scheduled retraining is available via `scripts/run_ml_scheduler.py` (APScheduler):
+- Weekly data refresh: Sunday 02:00 UTC
+- Monthly full retraining: 1st of month 03:00 UTC
+- Weekly evaluation report: Monday 08:00 UTC
 
 ---
 
 # 15. Current Status
 
+> **Updated:** 2026-08-17
+
 | Component | Status | Location |
 |-----------|--------|----------|
-| Ingestion clients | ✅ Code exists | `research/ingestion/` |
-| Storage (Parquet) | ✅ Code exists | `research/ingestion/storage.py` |
-| Feature engineering | ✅ Code exists | `research/features/` |
-| Blueprint generator | ✅ Code exists | `research/models/blueprint_generator.py` |
-| Grid simulator | ✅ Code exists | `research/simulator/grid_simulator.py` |
-| Label generator | ✅ Code exists | `research/labels/generator.py` |
-| Dataset builder | ✅ Code exists | `research/dataset/builder.py` |
-| Model trainer | ✅ Code exists | `research/models/trainer.py` |
-| Model registry | ✅ Code exists | `research/models/registry.py` |
-| **Training orchestrator** | ❌ **Not yet** | `scripts/run_ml_training.py` |
-| **Historical data** | ❌ **Not yet** | Need to fetch |
-| **Trained models** | ❌ **Not yet** | Need to run pipeline |
+| Ingestion clients (OKX, Binance, Bybit) | ✅ Implemented | `research/ingestion/` |
+| Storage (Parquet) | ✅ Implemented | `research/ingestion/storage.py` |
+| Feature engineering | ✅ Implemented | `research/features/` |
+| Blueprint generator | ✅ Implemented | `research/models/blueprint_generator.py` |
+| Grid simulator | ✅ Implemented | `research/simulator/grid_simulator.py` |
+| Label generator | ✅ Implemented | `research/labels/generator.py` |
+| Dataset builder | ✅ Implemented | `research/dataset/builder.py` |
+| Model trainer | ✅ Implemented | `research/models/trainer.py` |
+| Model registry | ✅ Implemented | `research/models/registry.py` |
+| Training orchestrator | ✅ Implemented | `scripts/run_ml_training.py` |
+| Scheduled retraining | 🟡 Script exists, deployment pending | `scripts/run_ml_scheduler.py` |
+| Historical data | ✅ Fetched (9 markets, 38,880 candles, 6 months) | `data/research/v1/BINANCE/` |
+| Trained models | ✅ 6 LightGBM models DEPLOYED (Val ROC-AUC ~0.53, synthetic labels) | `models/` |
+| ResearchService ML mode integration | 🟡 Pending — heuristic mode active | `application/services/research_service.py` |
+
+**Notes:**
+- Data fetched via Binance public API fallback (`data-api.binance.vision`) due to OKX API DNS issues
+- Models promoted with `--force` since synthetic labels produce ~0.5 ROC-AUC (expected baseline)
+- Real simulation labels needed to reach target ROC-AUC > 0.75
 
 ---
 
@@ -575,3 +597,4 @@ Usage:
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2026-08-17 | Initial ML Training Pipeline specification |
+| 1.1 | 2026-08-17 | Updated §14-15: Training orchestrator implemented, historical data fetched (9 markets via Binance fallback), 6 models DEPLOYED. Added scheduler script reference. |

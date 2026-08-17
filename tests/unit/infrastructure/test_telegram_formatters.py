@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from okx_trading.infrastructure.telegram.formatters import (
+from trading_grid.infrastructure.telegram.formatters import (
     format_account_created,
     format_account_status,
     format_approval_request,

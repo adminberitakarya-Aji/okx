@@ -5,10 +5,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from okx_trading.config.settings import BybitSettings
-from okx_trading.domain.execution.models import Order
-from okx_trading.infrastructure.bybit.adapter import BybitAdapter
-from okx_trading.infrastructure.bybit.rest_client import BybitAPIError
+from trading_grid.config.settings import BybitSettings
+from trading_grid.domain.execution.models import Order
+from trading_grid.infrastructure.bybit.adapter import BybitAdapter
+from trading_grid.infrastructure.bybit.rest_client import BybitAPIError
 
 
 def _make_settings(testnet=True):
@@ -73,13 +73,13 @@ class TestBybitAdapterConnection:
 class TestBybitAdapterWebSocket:
     async def test_start_market_data_ws(self):
         adapter = _make_adapter()
-        with patch("okx_trading.infrastructure.bybit.adapter.BybitWebSocketClient") as mock_ws:
+        with patch("trading_grid.infrastructure.bybit.adapter.BybitWebSocketClient") as mock_ws:
             await adapter.start_market_data_ws()
             mock_ws.assert_called_once()
 
     async def test_start_private_ws(self):
         adapter = _make_adapter()
-        with patch("okx_trading.infrastructure.bybit.adapter.BybitWebSocketClient") as mock_ws:
+        with patch("trading_grid.infrastructure.bybit.adapter.BybitWebSocketClient") as mock_ws:
             await adapter.start_private_ws()
             mock_ws.assert_called_once()
 

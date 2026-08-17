@@ -11,7 +11,7 @@ from decimal import Decimal
 
 import pytest
 
-from okx_trading.domain.grid.models import (
+from trading_grid.domain.grid.models import (
     Blueprint,
     CalculatedGridPrices,
     GridLevelModel,

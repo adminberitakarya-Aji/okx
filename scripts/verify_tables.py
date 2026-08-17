@@ -4,7 +4,7 @@ import asyncio
 
 from sqlalchemy import text
 
-from okx_trading.infrastructure.database.engine import get_engine
+from trading_grid.infrastructure.database.engine import get_engine
 
 EXPECTED_TABLES = [
     "blueprints",

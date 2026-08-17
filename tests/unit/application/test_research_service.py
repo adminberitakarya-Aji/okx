@@ -19,13 +19,13 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from okx_trading.application.services.research_service import (
+from trading_grid.application.services.research_service import (
     DEFAULT_MARKETS,
     RankingResult,
     ResearchService,
 )
-from okx_trading.domain.grid.models import Blueprint
-from okx_trading.research.models.ranking import (
+from trading_grid.domain.grid.models import Blueprint
+from trading_grid.research.models.ranking import (
     MarketRecommendation,
     RecommendationAction,
     RiskLevel,
@@ -74,7 +74,7 @@ class TestResearchServiceInit:
 
     def test_init_with_custom_generator(self):
         """Service accepts a custom blueprint generator."""
-        from okx_trading.research.models.blueprint_generator import BlueprintGenerator
+        from trading_grid.research.models.blueprint_generator import BlueprintGenerator
 
         gen = BlueprintGenerator()
         service = ResearchService(blueprint_generator=gen)

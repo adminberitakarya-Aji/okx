@@ -12,7 +12,7 @@ from decimal import Decimal
 
 import pytest
 
-from okx_trading.config.settings import (
+from trading_grid.config.settings import (
     AppSettings,
     DatabaseSettings,
     Environment,

@@ -1,5 +1,5 @@
 # ============================================================================
-# OKX AI Trading Grid System - Makefile
+# Trading Grid AI System - Makefile
 # ============================================================================
 # Usage: make <command>
 # Note: On Windows, use 'make' via Git Bash, WSL, or use commands directly
@@ -48,7 +48,7 @@ test-e2e:
 
 ## Run tests with coverage report
 test-coverage:
-	uv run pytest --cov=okx_trading --cov-report=html --cov-report=term
+	uv run pytest --cov=trading_grid --cov-report=html --cov-report=term
 
 ## Run tests in watch mode (requires pytest-watch)
 test-watch:
@@ -87,7 +87,7 @@ check: lint format-check typecheck test
 
 ## Start development server
 dev:
-	uv run uvicorn okx_trading.api.app:create_app --factory --reload --host 0.0.0.0 --port 8000
+	uv run uvicorn trading_grid.api.app:create_app --factory --reload --host 0.0.0.0 --port 8000
 
 ## Start Telegram bot
 telegram:
@@ -95,7 +95,7 @@ telegram:
 
 ## Start development server with specific port
 dev-port:
-	uv run uvicorn okx_trading.api.app:create_app --factory --reload --host 0.0.0.0 --port $(PORT)
+	uv run uvicorn trading_grid.api.app:create_app --factory --reload --host 0.0.0.0 --port $(PORT)
 
 ## Run database migrations
 migrate:
@@ -131,7 +131,7 @@ verify-tables:
 
 ## Build Docker image
 docker-build:
-	docker build -t okx-trading .
+	docker build -t trading-grid .
 
 ## Start production services
 docker-up:
@@ -160,7 +160,7 @@ clean:
 
 ## Show this help
 help:
-	@echo "OKX AI Trading Grid System - Available Commands:"
+	@echo "Trading Grid AI System - Available Commands:"
 	@echo ""
 	@echo "Installation:"
 	@echo "  make install          Install all dependencies (base + dev)"

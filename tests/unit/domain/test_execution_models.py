@@ -11,7 +11,7 @@ from decimal import Decimal
 
 import pytest
 
-from okx_trading.domain.execution.models import (
+from trading_grid.domain.execution.models import (
     ExecutionEconomics,
     Fill,
     MinimumProfitableExit,

@@ -18,8 +18,8 @@ import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
-from okx_trading.api.middleware.auth import DEV_API_KEYS, AuthMiddleware
-from okx_trading.config.settings import AppSettings, Environment, Settings
+from trading_grid.api.middleware.auth import DEV_API_KEYS, AuthMiddleware
+from trading_grid.config.settings import AppSettings, Environment, Settings
 
 
 def _make_settings(env: Environment, debug: bool, dev_auth_enabled: bool) -> Settings:
@@ -61,7 +61,7 @@ class TestDenyByDefault:
     def test_unauthenticated_request_denied_by_default(self, client: TestClient) -> None:
         """With secure defaults, an unauthenticated request gets 401."""
         settings = _make_settings(env=Environment.DEVELOPMENT, debug=False, dev_auth_enabled=False)
-        with patch("okx_trading.config.settings.get_settings", return_value=settings):
+        with patch("trading_grid.config.settings.get_settings", return_value=settings):
             response = client.get("/protected")
         assert response.status_code == 401
         assert response.json()["code"] == "AUTHENTICATION_FAILED"
@@ -69,7 +69,7 @@ class TestDenyByDefault:
     def test_debug_true_alone_does_not_bypass_auth(self, client: TestClient) -> None:
         """SECURITY: APP_DEBUG=true must NOT grant an identity without auth."""
         settings = _make_settings(env=Environment.DEVELOPMENT, debug=True, dev_auth_enabled=False)
-        with patch("okx_trading.config.settings.get_settings", return_value=settings):
+        with patch("trading_grid.config.settings.get_settings", return_value=settings):
             response = client.get("/protected")
         assert response.status_code == 401
 
@@ -80,7 +80,7 @@ class TestDevAuthBypass:
     def test_dev_bypass_requires_explicit_flag(self, client: TestClient) -> None:
         """Dev identity granted only when dev_auth_enabled=true in development."""
         settings = _make_settings(env=Environment.DEVELOPMENT, debug=False, dev_auth_enabled=True)
-        with patch("okx_trading.config.settings.get_settings", return_value=settings):
+        with patch("trading_grid.config.settings.get_settings", return_value=settings):
             response = client.get("/protected")
         assert response.status_code == 200
         assert response.json()["identity_id"] == "dev-user"
@@ -88,7 +88,7 @@ class TestDevAuthBypass:
     def test_dev_identity_is_demo_only(self, client: TestClient) -> None:
         """SECURITY: the dev identity must never be allowed LIVE access."""
         settings = _make_settings(env=Environment.DEVELOPMENT, debug=False, dev_auth_enabled=True)
-        with patch("okx_trading.config.settings.get_settings", return_value=settings):
+        with patch("trading_grid.config.settings.get_settings", return_value=settings):
             response = client.get("/protected")
         assert response.status_code == 200
         assert response.json()["allowed_environments"] == ["DEMO"]
@@ -101,7 +101,7 @@ class TestDevApiKeys:
     def test_dev_api_key_accepted_in_development(self, client: TestClient) -> None:
         """A dev API key authenticates in the development environment."""
         settings = _make_settings(env=Environment.DEVELOPMENT, debug=False, dev_auth_enabled=False)
-        with patch("okx_trading.config.settings.get_settings", return_value=settings):
+        with patch("trading_grid.config.settings.get_settings", return_value=settings):
             response = client.get("/protected", headers={"X-API-Key": "dev-admin-key"})
         assert response.status_code == 200
         assert response.json()["identity_id"] == "dev-admin"
@@ -109,14 +109,14 @@ class TestDevApiKeys:
     def test_dev_api_key_rejected_in_production(self, client: TestClient) -> None:
         """SECURITY: a dev API key must NOT authenticate in production."""
         settings = _make_settings(env=Environment.PRODUCTION, debug=False, dev_auth_enabled=False)
-        with patch("okx_trading.config.settings.get_settings", return_value=settings):
+        with patch("trading_grid.config.settings.get_settings", return_value=settings):
             response = client.get("/protected", headers={"X-API-Key": "dev-admin-key"})
         assert response.status_code == 401
 
     def test_unknown_api_key_rejected(self, client: TestClient) -> None:
         """An unknown API key is rejected."""
         settings = _make_settings(env=Environment.DEVELOPMENT, debug=False, dev_auth_enabled=False)
-        with patch("okx_trading.config.settings.get_settings", return_value=settings):
+        with patch("trading_grid.config.settings.get_settings", return_value=settings):
             response = client.get("/protected", headers={"X-API-Key": "not-a-real-key"})
         assert response.status_code == 401
 
@@ -141,7 +141,7 @@ class TestPublicPaths:
         client = TestClient(app)
 
         settings = _make_settings(env=Environment.PRODUCTION, debug=False, dev_auth_enabled=False)
-        with patch("okx_trading.config.settings.get_settings", return_value=settings):
+        with patch("trading_grid.config.settings.get_settings", return_value=settings):
             response = client.get("/health")
         assert response.status_code == 200
         assert response.json() == {"status": "ok"}

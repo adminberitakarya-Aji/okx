@@ -26,7 +26,7 @@ from decimal import Decimal
 
 import pytest
 
-from okx_trading.research.features.execution_economics import (
+from trading_grid.research.features.execution_economics import (
     ExecutionEconomicsExtractor,
     ExecutionEconomicsFeatures,
     GridEconomicViability,

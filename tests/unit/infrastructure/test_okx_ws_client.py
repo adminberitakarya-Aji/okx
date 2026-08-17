@@ -18,8 +18,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from websockets.exceptions import ConnectionClosed
 
-from okx_trading.config.settings import OKXSettings
-from okx_trading.infrastructure.okx.websocket_client import OKXWebSocketClient
+from trading_grid.config.settings import OKXSettings
+from trading_grid.infrastructure.okx.websocket_client import OKXWebSocketClient
 
 
 def _make_settings(demo: bool = True) -> OKXSettings:
@@ -248,7 +248,7 @@ class TestConnect:
         fake_ws._recv = recv
 
         with patch(
-            "okx_trading.infrastructure.okx.websocket_client.websockets.connect",
+            "trading_grid.infrastructure.okx.websocket_client.websockets.connect",
             new_callable=AsyncMock,
             return_value=fake_ws,
         ):
@@ -262,7 +262,7 @@ class TestConnect:
 
         with (
             patch(
-                "okx_trading.infrastructure.okx.websocket_client.websockets.connect",
+                "trading_grid.infrastructure.okx.websocket_client.websockets.connect",
                 new_callable=AsyncMock,
                 side_effect=OSError("connection refused"),
             ),
@@ -281,7 +281,7 @@ class TestConnect:
 
         with (
             patch(
-                "okx_trading.infrastructure.okx.websocket_client.websockets.connect",
+                "trading_grid.infrastructure.okx.websocket_client.websockets.connect",
                 new_callable=AsyncMock,
                 side_effect=OSError("refused"),
             ),

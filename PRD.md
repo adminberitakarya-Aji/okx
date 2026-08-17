@@ -1,6 +1,6 @@
 # PRODUCT REQUIREMENTS DOCUMENT (PRD)
 
-**Product Name:** OKX AI Trading Grid System
+**Product Name:** Trading Grid AI System
 **Version:** 1.0
 **Date:** 2026-08-15
 **Status:** Draft
@@ -9,7 +9,7 @@
 
 # 1. Product Overview
 
-The OKX AI Trading Grid System is an AI-assisted trading platform that combines machine learning research, hierarchical grid strategy, and immediate execution to trade on OKX Spot markets.
+The Trading Grid AI System is an AI-assisted trading platform that combines machine learning research, hierarchical grid strategy, and immediate execution to trade on OKX Spot markets.
 
 The system uses AI to:
 - Research and rank market opportunities

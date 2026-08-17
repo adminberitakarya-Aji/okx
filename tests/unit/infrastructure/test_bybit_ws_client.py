@@ -18,8 +18,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from websockets.exceptions import ConnectionClosed
 
-from okx_trading.config.settings import BybitSettings
-from okx_trading.infrastructure.bybit.websocket_client import BybitWebSocketClient
+from trading_grid.config.settings import BybitSettings
+from trading_grid.infrastructure.bybit.websocket_client import BybitWebSocketClient
 
 
 def _make_settings(testnet: bool = True) -> BybitSettings:
@@ -254,7 +254,7 @@ class TestConnect:
         fake_ws._recv = recv
 
         with patch(
-            "okx_trading.infrastructure.bybit.websocket_client.websockets.connect",
+            "trading_grid.infrastructure.bybit.websocket_client.websockets.connect",
             new_callable=AsyncMock,
             return_value=fake_ws,
         ):
@@ -267,7 +267,7 @@ class TestConnect:
 
         with (
             patch(
-                "okx_trading.infrastructure.bybit.websocket_client.websockets.connect",
+                "trading_grid.infrastructure.bybit.websocket_client.websockets.connect",
                 new_callable=AsyncMock,
                 side_effect=OSError("connection refused"),
             ),
@@ -286,7 +286,7 @@ class TestConnect:
 
         with (
             patch(
-                "okx_trading.infrastructure.bybit.websocket_client.websockets.connect",
+                "trading_grid.infrastructure.bybit.websocket_client.websockets.connect",
                 new_callable=AsyncMock,
                 side_effect=OSError("refused"),
             ),

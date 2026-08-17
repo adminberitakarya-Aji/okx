@@ -30,10 +30,10 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
-from okx_trading.application.services.exchange_factory import ExchangeAdapterFactory
-from okx_trading.application.services.service_container import MultiExchangeContainer
-from okx_trading.config.settings import get_settings
-from okx_trading.infrastructure.telegram.handlers import register_handlers
+from trading_grid.application.services.exchange_factory import ExchangeAdapterFactory
+from trading_grid.application.services.service_container import MultiExchangeContainer
+from trading_grid.config.settings import get_settings
+from trading_grid.infrastructure.telegram.handlers import register_handlers
 
 logger = structlog.get_logger()
 

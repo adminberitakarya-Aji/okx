@@ -1,12 +1,12 @@
 [project]
-name = "okx-trading"
+name = "trading-grid"
 version = "0.1.0"
-description = "OKX AI Trading Grid System - AI-assisted grid trading platform"
+description = "Trading Grid AI System - AI-assisted grid trading platform"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
-authors = [{ name = "OKX Trading Team" }]
-keywords = ["trading", "okx", "grid-trading", "ml", "ai"]
+authors = [{ name = "Trading Grid Team" }]
+keywords = ["trading", "grid-trading", "ml", "ai"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -63,7 +63,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/okx_trading"]
+packages = ["src/trading_grid"]
 
 # ============================================================================
 # RUFF CONFIGURATION
@@ -101,7 +101,7 @@ ignore = [
 "__init__.py" = ["F401"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["okx_trading"]
+known-first-party = ["trading_grid"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -169,7 +169,7 @@ asyncio_default_fixture_loop_scope = "function"
 # COVERAGE CONFIGURATION
 # ============================================================================
 [tool.coverage.run]
-source = ["src/okx_trading"]
+source = ["src/trading_grid"]
 branch = true
 omit = [
     "*/tests/*",

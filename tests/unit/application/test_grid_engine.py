@@ -12,12 +12,12 @@ from decimal import Decimal
 
 import pytest
 
-from okx_trading.application.services.grid_engine import (
+from trading_grid.application.services.grid_engine import (
     GridEngine,
     GridEngineError,
     GridRuntime,
 )
-from okx_trading.domain.grid.models import Blueprint, Section
+from trading_grid.domain.grid.models import Blueprint, Section
 
 
 def create_test_blueprint(

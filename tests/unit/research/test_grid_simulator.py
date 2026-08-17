@@ -18,9 +18,9 @@ from decimal import Decimal
 
 import pytest
 
-from okx_trading.domain.grid.models import Blueprint, Section
-from okx_trading.domain.market.models import Candle
-from okx_trading.research.simulator.grid_simulator import (
+from trading_grid.domain.grid.models import Blueprint, Section
+from trading_grid.domain.market.models import Candle
+from trading_grid.research.simulator.grid_simulator import (
     EventType,
     GridSimulator,
     ScenarioMode,

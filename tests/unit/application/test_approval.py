@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from okx_trading.application.services.approval import (
+from trading_grid.application.services.approval import (
     ApprovalError,
     ApprovalRequest,
     ApprovalService,

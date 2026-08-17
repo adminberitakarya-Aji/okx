@@ -6,7 +6,7 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from okx_trading.api.schemas.common import (
+from trading_grid.api.schemas.common import (
     ErrorResponse,
     HealthResponse,
     OperationResponse,
@@ -15,7 +15,7 @@ from okx_trading.api.schemas.common import (
     ReadinessResponse,
     ResponseEnvelope,
 )
-from okx_trading.api.schemas.grid import (
+from trading_grid.api.schemas.grid import (
     BlueprintResponse,
     GridControlResponse,
     GridListResponse,
@@ -23,14 +23,14 @@ from okx_trading.api.schemas.grid import (
     GridStartRequest,
     SectionResponse,
 )
-from okx_trading.api.schemas.research import (
+from trading_grid.api.schemas.research import (
     MarketRecommendationResponse,
     MarketResearchResponse,
     RecommendationListResponse,
     ResearchRunRequest,
     ResearchUniverseResponse,
 )
-from okx_trading.api.schemas.system import (
+from trading_grid.api.schemas.system import (
     AccountResponse,
     ApprovalDecisionRequest,
     ApprovalResponse,

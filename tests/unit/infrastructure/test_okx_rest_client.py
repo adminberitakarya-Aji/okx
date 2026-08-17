@@ -15,8 +15,8 @@ import httpx
 import pytest
 import tenacity
 
-from okx_trading.config.settings import OKXSettings
-from okx_trading.infrastructure.okx.rest_client import OKXAPIError, OKXRestClient
+from trading_grid.config.settings import OKXSettings
+from trading_grid.infrastructure.okx.rest_client import OKXAPIError, OKXRestClient
 
 
 def _make_settings(demo: bool = True) -> OKXSettings:

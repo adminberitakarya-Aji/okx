@@ -11,11 +11,11 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from okx_trading.config.settings import BybitSettings
-from okx_trading.domain.execution.models import Order
-from okx_trading.infrastructure.bybit.adapter import BybitAdapter
-from okx_trading.infrastructure.bybit.rest_client import BybitAPIError
-from okx_trading.infrastructure.exchange.symbols import (
+from trading_grid.config.settings import BybitSettings
+from trading_grid.domain.execution.models import Order
+from trading_grid.infrastructure.bybit.adapter import BybitAdapter
+from trading_grid.infrastructure.bybit.rest_client import BybitAPIError
+from trading_grid.infrastructure.exchange.symbols import (
     to_concatenated_symbol,
     to_normalized_market_id,
 )

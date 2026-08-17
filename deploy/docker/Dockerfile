@@ -1,8 +1,8 @@
 # ============================================================================
-# OKX AI Trading Grid System - Production Dockerfile
+# Trading Grid AI System - Production Dockerfile
 # ============================================================================
 # Multi-stage build for smaller image size
-# Usage: docker build -f deploy/docker/Dockerfile -t okx-trading .
+# Usage: docker build -f deploy/docker/Dockerfile -t trading-grid .
 # ============================================================================
 
 # ----------------------------------------------------------------------------
@@ -73,4 +73,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Default command
-CMD ["uvicorn", "okx_trading.api.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "trading_grid.api.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]

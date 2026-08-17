@@ -2,8 +2,8 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from okx_trading.infrastructure.telegram import handlers
-from okx_trading.infrastructure.telegram.handlers import (
+from trading_grid.infrastructure.telegram import handlers
+from trading_grid.infrastructure.telegram.handlers import (
     _get_editable_message,
     callback_auth_create,
     callback_blueprint_detail,
@@ -553,7 +553,7 @@ class TestRegisterHandlers:
 
 class TestMultiExchangeContainer:
     def test_get_container_creates_per_exchange(self):
-        from okx_trading.application.services.service_container import MultiExchangeContainer
+        from trading_grid.application.services.service_container import MultiExchangeContainer
 
         mock_settings = MagicMock()
         multi = MultiExchangeContainer(mock_settings)
@@ -569,7 +569,7 @@ class TestMultiExchangeContainer:
         assert binance is not bybit
 
     def test_get_container_returns_same_instance(self):
-        from okx_trading.application.services.service_container import MultiExchangeContainer
+        from trading_grid.application.services.service_container import MultiExchangeContainer
 
         mock_settings = MagicMock()
         multi = MultiExchangeContainer(mock_settings)
@@ -579,7 +579,7 @@ class TestMultiExchangeContainer:
         assert c1 is c2
 
     def test_get_container_invalid_exchange(self):
-        from okx_trading.application.services.service_container import MultiExchangeContainer
+        from trading_grid.application.services.service_container import MultiExchangeContainer
 
         mock_settings = MagicMock()
         multi = MultiExchangeContainer(mock_settings)
@@ -590,7 +590,7 @@ class TestMultiExchangeContainer:
             multi.get_container("KRAKEN")
 
     def test_default_container_is_okx(self):
-        from okx_trading.application.services.service_container import MultiExchangeContainer
+        from trading_grid.application.services.service_container import MultiExchangeContainer
 
         mock_settings = MagicMock()
         multi = MultiExchangeContainer(mock_settings)
@@ -598,7 +598,7 @@ class TestMultiExchangeContainer:
         assert multi.default_container.exchange_id == "OKX"
 
     def test_set_service_container_with_multi(self):
-        from okx_trading.application.services.service_container import MultiExchangeContainer
+        from trading_grid.application.services.service_container import MultiExchangeContainer
 
         mock_settings = MagicMock()
         multi = MultiExchangeContainer(mock_settings)
@@ -608,7 +608,7 @@ class TestMultiExchangeContainer:
         assert handlers.get_service_container() is multi.default_container
 
     def test_get_container_for_exchange(self):
-        from okx_trading.application.services.service_container import MultiExchangeContainer
+        from trading_grid.application.services.service_container import MultiExchangeContainer
 
         mock_settings = MagicMock()
         multi = MultiExchangeContainer(mock_settings)

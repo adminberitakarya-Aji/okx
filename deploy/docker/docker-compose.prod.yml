@@ -1,8 +1,8 @@
 # ============================================================================
-# OKX AI Trading Grid System - Production Docker Compose
+# Trading Grid AI System - Production Docker Compose
 # ============================================================================
 # Usage:
-#   docker compose --env-file /opt/okx/.env \
+#   docker compose --env-file /opt/trading-grid/.env \
 #     -f deploy/docker/docker-compose.prod.yml up -d
 #
 # Note: This is for VPS/production deployment only.
@@ -26,7 +26,7 @@ services:
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
-    container_name: okx-trading-app
+    container_name: trading-grid-app
     restart: unless-stopped
     ports:
       - "8000:8000"
@@ -43,7 +43,7 @@ services:
       - app-models:/app/models
       - app-logs:/app/logs
     networks:
-      - okx-network
+      - trading-grid-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -58,7 +58,7 @@ services:
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
-    container_name: okx-trading-telegram
+    container_name: trading-grid-telegram
     restart: unless-stopped
     command: ["python", "scripts/run_telegram_bot.py"]
     env_file:
@@ -74,7 +74,7 @@ services:
       - app-models:/app/models
       - app-logs:/app/logs
     networks:
-      - okx-network
+      - trading-grid-network
     healthcheck:
       test: ["CMD-SHELL", "python -c 'import sys; sys.exit(0)'"]
       interval: 30s
@@ -85,16 +85,16 @@ services:
   # --------------------------------------------------------------------------
   # WORKER (Background tasks - Phase 3+)
   # --------------------------------------------------------------------------
-  # NOTE: Disabled until okx_trading.workers.research_worker module exists.
+  # NOTE: Disabled until trading_grid.workers.research_worker module exists.
   # Uncomment when the worker module is implemented (Phase 3+).
   #
   # worker:
   #   build:
   #     context: ../..
   #     dockerfile: deploy/docker/Dockerfile
-  #   container_name: okx-trading-worker
+  #   container_name: trading-grid-worker
   #   restart: unless-stopped
-  #   command: ["python", "-m", "okx_trading.workers.research_worker"]
+  #   command: ["python", "-m", "trading_grid.workers.research_worker"]
   #   env_file:
   #     - ../../.env
   #   environment:
@@ -108,7 +108,7 @@ services:
   #     - app-models:/app/models
   #     - app-logs:/app/logs
   #   networks:
-  #     - okx-network
+  #     - trading-grid-network
 
   # --------------------------------------------------------------------------
   # DATABASE (PostgreSQL + TimescaleDB) - PHASE 2 ONLY
@@ -118,11 +118,11 @@ services:
   #
   # db:
   #   image: timescale/timescaledb:latest-pg15
-  #   container_name: okx-trading-db
+  #   container_name: trading-grid-db
   #   restart: unless-stopped
   #   environment:
-  #     POSTGRES_DB: ${DB_NAME:-okx_trading}
-  #     POSTGRES_USER: ${DB_USER:-okx_user}
+  #     POSTGRES_DB: ${DB_NAME:-trading_grid}
+  #     POSTGRES_USER: ${DB_USER:-trading_grid_user}
   #     POSTGRES_PASSWORD: ${DB_PASSWORD}
   #     POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
   #   volumes:
@@ -131,9 +131,9 @@ services:
   #   ports:
   #     - "127.0.0.1:5432:5432"  # Only accessible from localhost
   #   networks:
-  #     - okx-network
+  #     - trading-grid-network
   #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-okx_user} -d ${DB_NAME:-okx_trading}"]
+  #     test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-trading_grid_user} -d ${DB_NAME:-trading_grid}"]
   #     interval: 10s
   #     timeout: 5s
   #     retries: 5
@@ -144,7 +144,7 @@ services:
   # --------------------------------------------------------------------------
   redis:
     image: redis:7-alpine
-    container_name: okx-trading-redis
+    container_name: trading-grid-redis
     restart: unless-stopped
     # Handle empty REDIS_PASSWORD gracefully (no --requirepass flag)
     command: redis-server --appendonly yes ${REDIS_PASSWORD:+--requirepass $REDIS_PASSWORD}
@@ -153,7 +153,7 @@ services:
     ports:
       - "127.0.0.1:6379:6379"  # Only accessible from localhost
     networks:
-      - okx-network
+      - trading-grid-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -165,7 +165,7 @@ services:
   # --------------------------------------------------------------------------
   # nginx:
   #   image: nginx:alpine
-  #   container_name: okx-trading-nginx
+  #   container_name: trading-grid-nginx
   #   restart: unless-stopped
   #   ports:
   #     - "80:80"
@@ -176,7 +176,7 @@ services:
   #   depends_on:
   #     - app
   #   networks:
-  #     - okx-network
+  #     - trading-grid-network
 
 # ----------------------------------------------------------------------------
 # VOLUMES
@@ -197,5 +197,5 @@ volumes:
 # NETWORKS
 # ----------------------------------------------------------------------------
 networks:
-  okx-network:
+  trading-grid-network:
     driver: bridge

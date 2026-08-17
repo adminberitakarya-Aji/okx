@@ -1,4 +1,4 @@
-# OKX AI Trading Grid System
+# Trading Grid AI System
 
 AI-assisted trading platform for Spot grid trading on **OKX, Binance, and Bybit**.
 
@@ -91,7 +91,7 @@ uv run alembic upgrade head
 uv run pytest
 
 # Start development server
-uv run uvicorn okx_trading.api.app:create_app --factory --reload
+uv run uvicorn trading_grid.api.app:create_app --factory --reload
 ```
 
 ### Development Commands
@@ -116,8 +116,8 @@ uv run mypy src
 ## Project Structure
 
 ```
-OKX/
-├── src/okx_trading/
+TradingGrid/
+├── src/trading_grid/
 │   ├── domain/          # Pure business logic (NO framework imports)
 │   ├── research/        # AI Research pipeline
 │   ├── application/     # Use cases

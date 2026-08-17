@@ -1,6 +1,6 @@
 """Tests for Telegram inline keyboard builders."""
 
-from okx_trading.infrastructure.telegram.keyboards import (
+from trading_grid.infrastructure.telegram.keyboards import (
     account_menu_keyboard,
     approval_keyboard,
     blueprint_detail_keyboard,

@@ -19,12 +19,12 @@ from decimal import Decimal
 
 import pytest
 
-from okx_trading.research.models.blueprint_generator import (
+from trading_grid.research.models.blueprint_generator import (
     BLUEPRINT_GENERATOR_VERSION,
     BlueprintConfig,
     BlueprintGenerator,
 )
-from okx_trading.research.models.ranking import (
+from trading_grid.research.models.ranking import (
     MarketRecommendation,
     RecommendationAction,
     RiskLevel,

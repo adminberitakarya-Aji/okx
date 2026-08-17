@@ -13,7 +13,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from okx_trading.application.services.monitoring import (
+from trading_grid.application.services.monitoring import (
     Alert,
     AlertRule,
     AlertSeverity,

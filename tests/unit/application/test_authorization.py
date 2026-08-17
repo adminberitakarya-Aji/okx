@@ -11,7 +11,7 @@ Tests cover:
 
 import pytest
 
-from okx_trading.application.services.authorization import (
+from trading_grid.application.services.authorization import (
     AuthorizationError,
     AuthorizationService,
     Identity,

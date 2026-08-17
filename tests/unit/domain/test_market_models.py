@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import pytest
 
-from okx_trading.domain.market.models import (
+from trading_grid.domain.market.models import (
     Candle,
     Market,
     MarketState,

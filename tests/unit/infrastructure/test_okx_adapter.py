@@ -5,10 +5,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from okx_trading.config.settings import OKXSettings
-from okx_trading.domain.execution.models import Order
-from okx_trading.infrastructure.okx.adapter import OKXAdapter
-from okx_trading.infrastructure.okx.rest_client import OKXAPIError
+from trading_grid.config.settings import OKXSettings
+from trading_grid.domain.execution.models import Order
+from trading_grid.infrastructure.okx.adapter import OKXAdapter
+from trading_grid.infrastructure.okx.rest_client import OKXAPIError
 
 
 def _make_settings(demo=True):
@@ -74,13 +74,13 @@ class TestOKXAdapterConnection:
 class TestOKXAdapterWebSocket:
     async def test_start_market_data_ws(self):
         adapter = _make_adapter()
-        with patch("okx_trading.infrastructure.okx.adapter.OKXWebSocketClient") as mock_ws:
+        with patch("trading_grid.infrastructure.okx.adapter.OKXWebSocketClient") as mock_ws:
             await adapter.start_market_data_ws()
             mock_ws.assert_called_once()
 
     async def test_start_private_ws(self):
         adapter = _make_adapter()
-        with patch("okx_trading.infrastructure.okx.adapter.OKXWebSocketClient") as mock_ws:
+        with patch("trading_grid.infrastructure.okx.adapter.OKXWebSocketClient") as mock_ws:
             await adapter.start_private_ws()
             mock_ws.assert_called_once()
 

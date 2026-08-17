@@ -18,8 +18,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from websockets.exceptions import ConnectionClosed
 
-from okx_trading.config.settings import BinanceSettings
-from okx_trading.infrastructure.binance.websocket_client import BinanceWebSocketClient
+from trading_grid.config.settings import BinanceSettings
+from trading_grid.infrastructure.binance.websocket_client import BinanceWebSocketClient
 
 
 def _make_settings(testnet: bool = True) -> BinanceSettings:
@@ -218,7 +218,7 @@ class TestConnect:
         fake_ws._recv = recv
 
         with patch(
-            "okx_trading.infrastructure.binance.websocket_client.websockets.connect",
+            "trading_grid.infrastructure.binance.websocket_client.websockets.connect",
             new_callable=AsyncMock,
             return_value=fake_ws,
         ):
@@ -231,7 +231,7 @@ class TestConnect:
 
         with (
             patch(
-                "okx_trading.infrastructure.binance.websocket_client.websockets.connect",
+                "trading_grid.infrastructure.binance.websocket_client.websockets.connect",
                 new_callable=AsyncMock,
                 side_effect=OSError("connection refused"),
             ),
@@ -250,7 +250,7 @@ class TestConnect:
 
         with (
             patch(
-                "okx_trading.infrastructure.binance.websocket_client.websockets.connect",
+                "trading_grid.infrastructure.binance.websocket_client.websockets.connect",
                 new_callable=AsyncMock,
                 side_effect=OSError("refused"),
             ),
@@ -275,7 +275,7 @@ class TestConnect:
                 client, "_create_listen_key", new_callable=AsyncMock, return_value="my-listen-key"
             ),
             patch(
-                "okx_trading.infrastructure.binance.websocket_client.websockets.connect",
+                "trading_grid.infrastructure.binance.websocket_client.websockets.connect",
                 new_callable=AsyncMock,
                 return_value=fake_ws,
             ) as mock_connect,

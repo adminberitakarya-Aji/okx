@@ -16,21 +16,21 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from okx_trading.application.services.execution_engine import (
+from trading_grid.application.services.execution_engine import (
     ExecutionEngine,
     ExecutionResult,
 )
-from okx_trading.application.services.risk_validation import RiskValidationService
-from okx_trading.application.services.tenant_limits import (
+from trading_grid.application.services.risk_validation import RiskValidationService
+from trading_grid.application.services.tenant_limits import (
     MaxGridsExceededError,
     RateLimitExceededError,
     TenantLimitsService,
     UserEmergencyStoppedError,
 )
-from okx_trading.domain.exchange.errors import ExchangeAPIError
-from okx_trading.domain.exchange.interface import ExchangeAdapter
-from okx_trading.domain.execution.models import Order, Position
-from okx_trading.domain.risk.models import (
+from trading_grid.domain.exchange.errors import ExchangeAPIError
+from trading_grid.domain.exchange.interface import ExchangeAdapter
+from trading_grid.domain.execution.models import Order, Position
+from trading_grid.domain.risk.models import (
     RiskValidationResult,
     RiskViolation,
 )
@@ -411,7 +411,7 @@ class TestExecuteOrderTenantLimits:
         engine = _make_engine(tenant_limits=tenant_limits)
 
         with patch(
-            "okx_trading.application.services.execution_engine.logger.warning"
+            "trading_grid.application.services.execution_engine.logger.warning"
         ) as mock_warning:
             result = await engine.execute_order(
                 market_id="BTC-USDT",

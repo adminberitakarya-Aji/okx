@@ -16,8 +16,8 @@ import httpx
 import pytest
 import tenacity
 
-from okx_trading.config.settings import BybitSettings
-from okx_trading.infrastructure.bybit.rest_client import (
+from trading_grid.config.settings import BybitSettings
+from trading_grid.infrastructure.bybit.rest_client import (
     RECV_WINDOW,
     BybitAPIError,
     BybitRestClient,

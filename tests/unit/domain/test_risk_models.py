@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pytest
 
-from okx_trading.domain.risk.models import (
+from trading_grid.domain.risk.models import (
     ApprovalRequest,
     MarketRiskAssessment,
     PortfolioRisk,

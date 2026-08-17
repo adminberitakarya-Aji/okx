@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from okx_trading.research.features.derived_ml import (
+from trading_grid.research.features.derived_ml import (
     DERIVED_ML_VERSION,
     DerivedMLExtractor,
     DerivedMLFeatures,

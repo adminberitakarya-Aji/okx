@@ -1,6 +1,6 @@
 """Tests for audit service."""
 
-from okx_trading.application.services.audit import (
+from trading_grid.application.services.audit import (
     SENSITIVE_KEYS,
     AuditRecord,
     AuditService,

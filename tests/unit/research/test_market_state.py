@@ -13,8 +13,8 @@ from decimal import Decimal
 
 import pytest
 
-from okx_trading.domain.market.models import Candle
-from okx_trading.research.features.market_state import (
+from trading_grid.domain.market.models import Candle
+from trading_grid.research.features.market_state import (
     CandleStructure,
     MarketStateFeatureExtractor,
     MarketStateFeatures,

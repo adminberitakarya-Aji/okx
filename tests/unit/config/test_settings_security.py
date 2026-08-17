@@ -14,7 +14,7 @@ import logging
 
 import pytest
 
-from okx_trading.config.settings import (
+from trading_grid.config.settings import (
     AppSettings,
     BinanceSettings,
     BybitSettings,

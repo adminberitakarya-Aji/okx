@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import pytest
 
-from okx_trading.research.labels.generator import (
+from trading_grid.research.labels.generator import (
     LABEL_DEFINITIONS,
     LABEL_VERSION,
     LabelClass,
@@ -14,7 +14,7 @@ from okx_trading.research.labels.generator import (
     LabelType,
     SimulationStatus,
 )
-from okx_trading.research.simulator.grid_simulator import SimulationResult
+from trading_grid.research.simulator.grid_simulator import SimulationResult
 
 
 def create_mock_simulation_result(

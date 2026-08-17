@@ -10,7 +10,7 @@ Verifies:
 
 import pytest
 
-from okx_trading.infrastructure.exchange.symbols import (
+from trading_grid.infrastructure.exchange.symbols import (
     to_concatenated_symbol,
     to_normalized_market_id,
 )

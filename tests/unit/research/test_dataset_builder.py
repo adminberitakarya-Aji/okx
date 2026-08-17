@@ -15,7 +15,7 @@ import pytest
 if TYPE_CHECKING:
     from pathlib import Path
 
-from okx_trading.research.dataset.builder import (
+from trading_grid.research.dataset.builder import (
     CausalIntegrityValidator,
     DataQualityFlags,
     DatasetBuilder,

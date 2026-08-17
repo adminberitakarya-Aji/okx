@@ -20,8 +20,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from okx_trading.application.services.user_service import UserService
-from okx_trading.infrastructure.database.models import (
+from trading_grid.application.services.user_service import UserService
+from trading_grid.infrastructure.database.models import (
     ExchangeIntegrationModel,
     PairingSessionModel,
     TelegramIdentityModel,

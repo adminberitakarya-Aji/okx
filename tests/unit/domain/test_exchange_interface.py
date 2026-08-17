@@ -13,10 +13,10 @@ from typing import ClassVar
 
 import pytest
 
-from okx_trading.domain.exchange.interface import ExchangeAdapter
-from okx_trading.infrastructure.binance.adapter import BinanceAdapter
-from okx_trading.infrastructure.bybit.adapter import BybitAdapter
-from okx_trading.infrastructure.okx.adapter import OKXAdapter
+from trading_grid.domain.exchange.interface import ExchangeAdapter
+from trading_grid.infrastructure.binance.adapter import BinanceAdapter
+from trading_grid.infrastructure.bybit.adapter import BybitAdapter
+from trading_grid.infrastructure.okx.adapter import OKXAdapter
 
 
 class TestExchangeAdapterIsABC:
@@ -111,7 +111,7 @@ class TestAdapterExchangeIds:
 
     def test_okx_exchange_id(self) -> None:
         """OKXAdapter.exchange_id == 'OKX'."""
-        from okx_trading.config.settings import OKXSettings
+        from trading_grid.config.settings import OKXSettings
 
         settings = OKXSettings(api_key="k", api_secret="s", passphrase="p", _env_file=None)
         adapter = OKXAdapter(settings)
@@ -119,7 +119,7 @@ class TestAdapterExchangeIds:
 
     def test_binance_exchange_id(self) -> None:
         """BinanceAdapter.exchange_id == 'BINANCE'."""
-        from okx_trading.config.settings import BinanceSettings
+        from trading_grid.config.settings import BinanceSettings
 
         settings = BinanceSettings(api_key="k", api_secret="s", _env_file=None)
         adapter = BinanceAdapter(settings)
@@ -127,7 +127,7 @@ class TestAdapterExchangeIds:
 
     def test_bybit_exchange_id(self) -> None:
         """BybitAdapter.exchange_id == 'BYBIT'."""
-        from okx_trading.config.settings import BybitSettings
+        from trading_grid.config.settings import BybitSettings
 
         settings = BybitSettings(api_key="k", api_secret="s", _env_file=None)
         adapter = BybitAdapter(settings)
@@ -139,7 +139,7 @@ class TestAdapterModes:
 
     def test_okx_demo_mode(self) -> None:
         """OKXAdapter defaults to DEMO."""
-        from okx_trading.config.settings import OKXSettings
+        from trading_grid.config.settings import OKXSettings
 
         settings = OKXSettings(api_key="k", api_secret="s", passphrase="p", _env_file=None)
         adapter = OKXAdapter(settings)
@@ -147,7 +147,7 @@ class TestAdapterModes:
 
     def test_binance_demo_mode(self) -> None:
         """BinanceAdapter defaults to DEMO (testnet)."""
-        from okx_trading.config.settings import BinanceSettings
+        from trading_grid.config.settings import BinanceSettings
 
         settings = BinanceSettings(api_key="k", api_secret="s", _env_file=None)
         adapter = BinanceAdapter(settings)
@@ -155,7 +155,7 @@ class TestAdapterModes:
 
     def test_bybit_demo_mode(self) -> None:
         """BybitAdapter defaults to DEMO (testnet)."""
-        from okx_trading.config.settings import BybitSettings
+        from trading_grid.config.settings import BybitSettings
 
         settings = BybitSettings(api_key="k", api_secret="s", _env_file=None)
         adapter = BybitAdapter(settings)
@@ -163,7 +163,7 @@ class TestAdapterModes:
 
     def test_binance_live_mode(self) -> None:
         """BinanceAdapter is LIVE when testnet_mode=False."""
-        from okx_trading.config.settings import BinanceSettings
+        from trading_grid.config.settings import BinanceSettings
 
         settings = BinanceSettings(api_key="k", api_secret="s", testnet_mode=False, _env_file=None)
         adapter = BinanceAdapter(settings)
@@ -171,7 +171,7 @@ class TestAdapterModes:
 
     def test_bybit_live_mode(self) -> None:
         """BybitAdapter is LIVE when testnet_mode=False."""
-        from okx_trading.config.settings import BybitSettings
+        from trading_grid.config.settings import BybitSettings
 
         settings = BybitSettings(api_key="k", api_secret="s", testnet_mode=False, _env_file=None)
         adapter = BybitAdapter(settings)

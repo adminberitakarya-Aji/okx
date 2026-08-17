@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 import numpy as np
 import pytest
 
-from okx_trading.research.models.ranking import (
+from trading_grid.research.models.ranking import (
     MarketRanker,
     ModelPredictions,
     RankingEvaluator,
@@ -14,10 +14,10 @@ from okx_trading.research.models.ranking import (
     SuitabilityEngine,
     SuitabilityWeights,
 )
-from okx_trading.research.models.registry import (
+from trading_grid.research.models.registry import (
     ModelRegistry,
 )
-from okx_trading.research.models.trainer import (
+from trading_grid.research.models.trainer import (
     ModelConfig,
     ModelFamily,
     ModelStatus,

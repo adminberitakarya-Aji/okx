@@ -14,16 +14,16 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from okx_trading.application.services.demo_trading import (
+from trading_grid.application.services.demo_trading import (
     DemoGridSession,
     DemoMetrics,
     DemoTradingError,
     DemoTradingService,
     DemoValidationReport,
 )
-from okx_trading.application.services.execution_engine import ExecutionEngine, ExecutionResult
-from okx_trading.application.services.grid_engine import GridEngine
-from okx_trading.domain.grid.models import Blueprint, Section
+from trading_grid.application.services.execution_engine import ExecutionEngine, ExecutionResult
+from trading_grid.application.services.grid_engine import GridEngine
+from trading_grid.domain.grid.models import Blueprint, Section
 
 
 def create_test_blueprint(

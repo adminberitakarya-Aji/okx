@@ -51,12 +51,18 @@ import structlog
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from okx_trading.research.ingestion.binance_client import BinanceHistoricalClient
-from okx_trading.research.ingestion.bybit_client import BybitHistoricalClient
-from okx_trading.research.ingestion.okx_client import OKXHistoricalClient
-from okx_trading.research.ingestion.storage import ParquetStorage
-from okx_trading.research.models.registry import ModelRegistry, PromotionThresholds
-from okx_trading.research.models.trainer import (
+from trading_grid.research.ingestion.binance_client import BinanceHistoricalClient
+from trading_grid.research.ingestion.bybit_client import BybitHistoricalClient
+from trading_grid.research.ingestion.okx_client import OKXHistoricalClient
+from trading_grid.research.ingestion.storage import ParquetStorage
+from trading_grid.research.labels.simulation_pipeline import (
+    SIMULATION_PIPELINE_VERSION,
+    SimulationLabelPipeline,
+    SimulationLabelPipelineConfig,
+    labels_to_dataframe,
+)
+from trading_grid.research.models.registry import ModelRegistry, PromotionThresholds
+from trading_grid.research.models.trainer import (
     ModelConfig,
     ModelFamily,
     ModelStatus,
@@ -479,7 +485,7 @@ def _compute_macd_signal(close: pd.Series) -> pd.Series:
 
 
 # =============================================================================
-# Stage 3-5: Simulation & Labels (Simplified)
+# Stage 3-5: Simulation & Labels (GridSimulator-based)
 # =============================================================================
 
 
@@ -487,81 +493,93 @@ def run_simulation_and_labels(config: PipelineConfig) -> dict[str, Any]:
     """
     Stages 3-5: Generate blueprints, run simulations, generate labels.
 
-    This is a simplified implementation that generates synthetic labels
-    based on historical volatility and price patterns. Full simulation
-    integration can be added later.
-    """
-    logger.info("stage_3_5_simulation_labels_started")
+    Uses the real GridSimulator to generate labels from deterministic
+    simulations. This ensures causal integrity:
+    - Blueprints are generated from historical market state only
+    - Simulations run on future candles (T+1 to T+horizon)
+    - Labels are extracted from actual simulation results
 
-    import numpy as np
+    This replaces the previous synthetic label generation with
+    real simulation-based labels per AI_RESEARCH_LABEL_SPEC.md.
+    """
+    logger.info(
+        "stage_3_5_simulation_labels_started",
+        pipeline_version=SIMULATION_PIPELINE_VERSION,
+        horizon_days=config.horizon_days,
+    )
+
     import pandas as pd
 
-    features_path = Path(config.data_dir) / "features" / "market_features.parquet"
-    if not features_path.exists():
-        raise FileNotFoundError("Features not found. Run --features first.")
+    # Initialize storage
+    storage = ParquetStorage(
+        base_dir=config.data_dir,
+        version="v1",
+        exchange_id=config.exchange,
+    )
 
-    features_df = pd.read_parquet(features_path)
+    # Configure simulation pipeline
+    horizon = f"{config.horizon_days}D"
+    sim_config = SimulationLabelPipelineConfig(
+        horizon=horizon,
+        observation_stride=24,  # Every 24 hours for 1H candles
+        buy_fee_rate=0.001,
+        sell_fee_rate=0.001,
+        slippage_pct=0.0005,
+    )
+
+    # Create and run pipeline
+    pipeline = SimulationLabelPipeline(storage=storage, config=sim_config)
+    pipeline_results = pipeline.run(
+        market_ids=config.markets,
+        interval=config.interval,
+    )
+
+    # Convert labels to DataFrame
+    labels_df = labels_to_dataframe(pipeline_results.label_sets)
 
     results: dict[str, Any] = {
-        "observations": len(features_df),
-        "labels_generated": 0,
+        "observations": pipeline_results.total_observations,
+        "labels_generated": len(labels_df),
+        "valid_labels": pipeline_results.valid_labels,
+        "invalid_simulations": pipeline_results.invalid_simulations,
+        "failed_simulations": pipeline_results.failed_simulations,
+        "success_rate": pipeline_results.success_rate,
+        "pipeline_version": SIMULATION_PIPELINE_VERSION,
     }
 
-    # Generate labels based on future returns (simplified approach)
-    # In production, this would use the full GridSimulator
-    labels = pd.DataFrame()
-    labels["market_id"] = features_df["market_id"]
-    labels["exchange_id"] = features_df["exchange_id"]
-    labels["timestamp"] = features_df["timestamp"]
-
-    # Group by market and compute forward returns
-    for market_id in features_df["market_id"].unique():
-        mask = features_df["market_id"] == market_id
-        market_features = features_df[mask].copy()
-
-        # Simulate grid outcome based on volatility and trend
-        volatility = market_features["volatility_24h"].values
-        trend = market_features["trend_strength"].values
-        rsi = market_features["rsi_14"].values
-
-        # Positive P&L more likely with:
-        # - Moderate volatility (not too low, not too high)
-        # - Ranging market (weak trend)
-        # - RSI not extreme
-        vol_score = np.exp(-((volatility - 0.02) ** 2) / (2 * 0.01**2))
-        range_score = np.exp(-(trend**2) / 0.01)
-        rsi_score = 1 - np.abs(rsi - 50) / 50
-
-        pnl_probability = 0.3 + 0.4 * vol_score * range_score * rsi_score
-        pnl_probability = np.clip(pnl_probability, 0.1, 0.9)
-
-        # Generate labels
-        positive_pnl = (np.random.random(len(market_features)) < pnl_probability).astype(int)
-        net_pnl_return = np.where(
-            positive_pnl == 1,
-            np.abs(np.random.normal(0.03, 0.02, len(market_features))),
-            -np.abs(np.random.normal(0.02, 0.015, len(market_features))),
-        )
-        max_drawdown = np.abs(np.random.normal(0.05, 0.03, len(market_features)))
-
-        labels.loc[mask, "positive_pnl"] = positive_pnl
-        labels.loc[mask, "net_pnl_return"] = net_pnl_return
-        labels.loc[mask, "max_drawdown"] = max_drawdown
-        labels.loc[mask, "capital_utilization"] = np.random.uniform(0.3, 0.9, len(market_features))
-        labels.loc[mask, "recovered"] = (np.random.random(len(market_features)) < 0.7).astype(int)
-        labels.loc[mask, "capital_exhausted"] = (
-            np.random.random(len(market_features)) < 0.05
-        ).astype(int)
-
-    results["labels_generated"] = len(labels)
+    if labels_df.empty:
+        logger.warning("no_valid_labels_generated", errors=pipeline_results.errors)
+        results["dataset_rows"] = 0
+        results["dataset_columns"] = 0
+        return results
 
     # Save labels
     labels_dir = Path(config.data_dir) / "labels"
     labels_dir.mkdir(parents=True, exist_ok=True)
-    labels.to_parquet(labels_dir / "grid_labels.parquet", index=False)
+    labels_df.to_parquet(labels_dir / "grid_labels.parquet", index=False)
 
-    # Save dataset (features + labels joined)
-    dataset = features_df.merge(labels, on=["market_id", "exchange_id", "timestamp"], how="inner")
+    # Load features and join with labels
+    features_path = Path(config.data_dir) / "features" / "market_features.parquet"
+    if features_path.exists():
+        features_df = pd.read_parquet(features_path)
+
+        # Ensure timestamp columns are datetime for merge
+        features_df["timestamp"] = pd.to_datetime(features_df["timestamp"])
+        labels_df["timestamp"] = pd.to_datetime(labels_df["timestamp"])
+
+        # Merge on market_id and timestamp
+        # Note: labels may have fewer rows than features (only valid simulations)
+        dataset = features_df.merge(
+            labels_df,
+            on=["market_id", "timestamp"],
+            how="inner",
+            suffixes=("", "_label"),
+        )
+    else:
+        logger.warning("features_not_found_using_labels_only")
+        dataset = labels_df
+
+    # Save dataset
     dataset_dir = Path(config.data_dir) / "dataset"
     dataset_dir.mkdir(parents=True, exist_ok=True)
     dataset.to_parquet(dataset_dir / "training_dataset.parquet", index=False)
@@ -573,6 +591,8 @@ def run_simulation_and_labels(config: PipelineConfig) -> dict[str, Any]:
         "stage_3_5_simulation_labels_completed",
         observations=results["observations"],
         labels_generated=results["labels_generated"],
+        valid_labels=results["valid_labels"],
+        success_rate=results["success_rate"],
         dataset_rows=results["dataset_rows"],
     )
 

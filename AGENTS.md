@@ -6,7 +6,7 @@ This document provides context and guidelines for AI coding agents (Claude, Clin
 
 ## 1. Project Overview
 
-**OKX AI Trading Grid System** — An AI-assisted trading platform that:
+**Trading Grid AI System** — An AI-assisted trading platform that:
 - Uses ML to rank Spot markets by grid trading suitability
 - Generates hierarchical grid blueprints (Sections + uniform spacing + adaptive gaps)
 - Executes trades with immediate execution (not passive limit orders)
@@ -86,11 +86,11 @@ This document provides context and guidelines for AI coding agents (Claude, Clin
 
 ## 4. Project Structure
 
-> **Note:** Reflects actual codebase as of 2026-08-16 (Phase 4 complete).
+> **Note:** Reflects actual codebase as of 2026-08-17 (Phase 7 M7.1-M7.4 complete).
 
 ```
-OKX/
-├── src/okx_trading/
+TradingGrid/
+├── src/trading_grid/
 │   ├── domain/              # Pure business logic (NO framework imports)
 │   │   ├── grid/            # models.py, calculator.py
 │   │   ├── market/          # models.py (Market, Candle, OrderBook)
@@ -100,13 +100,15 @@ OKX/
 │   │   └── shared/          # types.py, errors.py
 │   │
 │   ├── research/            # AI Research pipeline
-│   │   ├── ingestion/       # okx_client.py, storage.py (Parquet)
+│   │   ├── ingestion/       # okx_client.py, binance_client.py, bybit_client.py,
+│   │   │                    # storage.py (Parquet)
 │   │   ├── features/        # market_state.py, execution_economics.py,
 │   │   │                    # grid_behavior.py, derived_ml.py
 │   │   ├── simulator/       # grid_simulator.py (deterministic)
 │   │   ├── dataset/         # builder.py
 │   │   ├── labels/          # generator.py
-│   │   └── models/          # trainer.py, ranking.py, registry.py
+│   │   └── models/          # trainer.py, ranking.py, registry.py,
+│   │                        # blueprint_generator.py
 │   │
 │   ├── application/         # Use cases
 │   │   ├── commands/        # (reserved, currently empty)
@@ -114,7 +116,10 @@ OKX/
 │   │   └── services/        # authorization.py, approval.py, audit.py,
 │   │                        # user_service.py, grid_engine.py,
 │   │                        # execution_engine.py, demo_trading.py,
-│   │                        # monitoring.py
+│   │                        # monitoring.py, price_monitor.py,
+│   │                        # research_service.py, credential_service.py,
+│   │                        # exchange_factory.py, tenant_limits.py,
+│   │                        # risk_validation.py, service_container.py
 │   │
 │   ├── infrastructure/      # External integrations
 │   │   ├── exchange/        # symbols.py (market symbol normalization)
@@ -127,9 +132,15 @@ OKX/
 │   │
 │   ├── api/                 # FastAPI application
 │   │   ├── app.py           # App factory
-│   │   ├── routes/          # health.py, system.py, demo.py
+│   │   ├── routes/          # health.py, system.py, demo.py, account.py,
+│   │   │                    # approvals.py, blueprints.py, grid.py, markets.py,
+│   │   │                    # orders.py, pnl.py, positions.py, research.py,
+│   │   │                    # risk.py, simulations.py, dependencies.py
 │   │   ├── middleware/      # auth.py, audit.py
-│   │   └── schemas/         # common.py, grid.py, research.py, system.py, demo.py
+│   │   └── schemas/         # common.py, grid.py, research.py, system.py,
+│   │                        # demo.py, account.py, approvals.py, markets.py,
+│   │                        # orders.py, pnl.py, positions.py, risk.py,
+│   │                        # simulations.py
 │   │
 │   ├── workers/             # Background tasks (reserved, currently empty)
 │   └── config/              # settings.py (pydantic-settings)
@@ -137,12 +148,21 @@ OKX/
 ├── tests/
 │   ├── unit/                # domain/, research/, application/, api/,
 │   │                        # infrastructure/, config/
-│   ├── integration/         # api/, database/, okx/
+│   ├── integration/         # api/, database/, okx/, binance/, bybit/
 │   └── e2e/
 │
-├── alembic/                 # Database migrations
-├── docs/                    # All specification documents
-├── scripts/                 # test_db_connection.py, verify_tables.py
+├── alembic/                 # Database migrations (6 migrations)
+├── docs/                    # All specification documents (incl.
+│                            # ML_TRAINING_PIPELINE_SPEC.md,
+│                            # ADMIN_DASHBOARD_SPEC.md, DEPLOYMENT_PROXMOX.md)
+├── data/                    # Research data (gitignored): pipeline_state.json,
+│                            # research/v1/BINANCE/ (9 markets, 38,880 candles)
+├── models/                  # Trained ML models (gitignored): 6 LightGBM
+│                            # models DEPLOYED + registry/index.json
+├── scripts/                 # test_db_connection.py, test_ws_connection.py,
+│                            # verify_tables.py, debug_features.py,
+│                            # run_telegram_bot.py, run_ml_training.py,
+│                            # run_ml_scheduler.py, deploy.sh
 └── deploy/docker/           # Dockerfile, docker-compose.prod.yml (VPS only)
 ```
 

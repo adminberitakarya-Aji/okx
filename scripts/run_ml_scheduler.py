@@ -26,7 +26,6 @@ import argparse
 import asyncio
 import subprocess
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 
 import structlog
@@ -47,7 +46,7 @@ DEFAULT_MONTHS = 6
 
 def run_pipeline_command(args: list[str]) -> tuple[bool, str]:
     """Run ML training pipeline command synchronously."""
-    cmd = [sys.executable, str(ML_TRAINING_SCRIPT)] + args
+    cmd = [sys.executable, str(ML_TRAINING_SCRIPT), *args]
     logger.info("pipeline_command_started", command=" ".join(cmd))
 
     try:
