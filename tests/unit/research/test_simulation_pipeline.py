@@ -12,17 +12,14 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from pathlib import Path
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
-from trading_grid.domain.grid.models import Blueprint, Section
+from trading_grid.domain.grid.models import Blueprint
 from trading_grid.domain.market.models import Candle
 from trading_grid.research.labels.simulation_pipeline import (
     HORIZON_CANDLES_1H,
-    MIN_WARMUP_CANDLES,
     SIMULATION_PIPELINE_VERSION,
     PipelineResults,
     ResearchBlueprintConfig,
@@ -31,7 +28,6 @@ from trading_grid.research.labels.simulation_pipeline import (
     SimulationLabelPipelineConfig,
     labels_to_dataframe,
 )
-
 
 # =============================================================================
 # Fixtures
@@ -413,7 +409,7 @@ class TestLabelsToDataframe:
 
     def test_invalid_labels_are_excluded(self) -> None:
         """Invalid label sets should not appear in DataFrame."""
-        from trading_grid.research.labels.generator import LabelSet, SimulationStatus
+        from trading_grid.research.labels.generator import LabelSet
 
         # Create a mock invalid label set
         invalid_label = MagicMock(spec=LabelSet)

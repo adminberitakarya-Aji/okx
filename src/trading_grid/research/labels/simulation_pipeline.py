@@ -579,8 +579,8 @@ class SimulationLabelPipeline:
 
         # Standard deviation
         mean_return = sum(returns) / len(returns)
-        variance = sum((r - mean_return) ** 2 for r in returns) / len(returns)
-        return variance**0.5
+        variance: float = sum((r - mean_return) ** 2 for r in returns) / len(returns)
+        return float(variance**0.5)
 
     def _get_horizon_candles(self, interval: str) -> int:
         """Get number of candles for the configured horizon."""
