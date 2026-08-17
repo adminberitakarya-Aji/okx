@@ -434,9 +434,7 @@ class DemoTradingService:
 
         return session
 
-    async def _execute_initial_entry(
-        self, session: DemoGridSession
-    ) -> ExecutionResult | None:
+    async def _execute_initial_entry(self, session: DemoGridSession) -> ExecutionResult | None:
         """
         Execute the IMMEDIATE FIRST ENTRY for a grid.
 
@@ -547,9 +545,7 @@ class DemoTradingService:
             anchor.mark_filled(anchor.quantity, current_price)
 
             session.metrics.record_order_submitted()
-            session.add_note(
-                f"Initial entry executed: BUY {anchor.quantity} @ ~{current_price}"
-            )
+            session.add_note(f"Initial entry executed: BUY {anchor.quantity} @ ~{current_price}")
 
             logger.info(
                 "initial_entry_success",
@@ -562,8 +558,7 @@ class DemoTradingService:
             # Initial entry failed — grid can still start without position
             session.metrics.record_order_rejected("INITIAL_ENTRY_FAILED")
             session.add_note(
-                f"Initial entry failed: {result.error_message}. "
-                "Grid will trade on crossings only."
+                f"Initial entry failed: {result.error_message}. Grid will trade on crossings only."
             )
 
             logger.warning(
