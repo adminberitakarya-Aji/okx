@@ -1,0 +1,204 @@
+[project]
+name = "okx-trading"
+version = "0.1.0"
+description = "OKX AI Trading Grid System - AI-assisted grid trading platform"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "OKX Trading Team" }]
+keywords = ["trading", "okx", "grid-trading", "ml", "ai"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    # API Framework
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.5.0",
+    # HTTP & WebSocket
+    "httpx>=0.27.0",
+    "websockets>=13.0",
+    # Database
+    "sqlalchemy[asyncio]>=2.0.35",
+    "asyncpg>=0.29.0",
+    "alembic>=1.13.0",
+    # Telegram
+    "aiogram>=3.13.0",
+    # Data & ML
+    "pandas>=2.2.0",
+    "polars>=1.8.0",
+    "pyarrow>=17.0.0",
+    "pandas-ta>=0.3.14b",
+    "scikit-learn>=1.5.0",
+    "lightgbm>=4.5.0",
+    # Scheduling
+    "apscheduler>=3.10.0",
+    # Logging
+    "structlog>=24.4.0",
+    # Utilities
+    "python-dotenv>=1.0.0",
+    "tenacity>=9.0.0",
+    # Security (Phase 5: credential encryption)
+    "cryptography>=43.0.0",
+    # JWT Authentication
+    "PyJWT>=2.9.0",
+]
+
+[project.optional-dependencies]
+prod = [
+    # Task Queue (Phase 3+)
+    "arq>=0.26.0",
+    "redis>=5.0.0",
+    # Metrics
+    "prometheus-client>=0.20.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/okx_trading"]
+
+# ============================================================================
+# RUFF CONFIGURATION
+# ============================================================================
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "ARG", # flake8-unused-arguments
+    "SIM", # flake8-simplify
+    "TCH", # flake8-type-checking
+    "PTH", # flake8-use-pathlib
+    "ERA", # eradicate
+    "RUF", # ruff-specific rules
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "B008",  # do not perform function calls in argument defaults
+    "ARG001", # unused function argument (often used in interfaces)
+    "ARG002", # unused method argument
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ARG", "S101"]
+"__init__.py" = ["F401"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["okx_trading"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ============================================================================
+# MYPY CONFIGURATION
+# ============================================================================
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+show_error_codes = true
+pretty = true
+
+[[tool.mypy.overrides]]
+module = [
+    "pandas_ta.*",
+    "lightgbm.*",
+    "polars.*",
+    "scipy.*",
+    "sklearn.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+# ============================================================================
+# PYTEST CONFIGURATION
+# ============================================================================
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--tb=short",
+    "-x",  # stop on first failure
+]
+markers = [
+    "unit: Unit tests (fast, no external dependencies)",
+    "integration: Integration tests (may require database/network)",
+    "e2e: End-to-end tests (full system)",
+    "slow: Slow running tests",
+]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+# ============================================================================
+# COVERAGE CONFIGURATION
+# ============================================================================
+[tool.coverage.run]
+source = ["src/okx_trading"]
+branch = true
+omit = [
+    "*/tests/*",
+    "*/__init__.py",
+    "*/migrations/*",
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+fail_under = 80
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[dependency-groups]
+dev = [
+    # Testing
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=5.0.0",
+    "pytest-mock>=3.14.0",
+    "httpx>=0.27.0",  # For TestClient
+    # Linting & Type Checking
+    "ruff>=0.6.0",
+    "mypy>=1.11.0",
+    # Type stubs
+    "pandas-stubs>=3.0.5.260730",
+    # Development
+    "ipython>=8.27.0",
+]

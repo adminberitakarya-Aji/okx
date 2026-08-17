@@ -1,0 +1,195 @@
+# ============================================================================
+# OKX AI Trading Grid System - Production Docker Compose
+# ============================================================================
+# Usage:
+#   docker compose --env-file /opt/okx/.env \
+#     -f deploy/docker/docker-compose.prod.yml up -d
+#
+# Note: This is for VPS/production deployment only.
+#       Local development does NOT use Docker.
+#
+# PHASE 1 (Beta Trial): Uses Supabase cloud database.
+#   - DATABASE_URL comes from .env (env_file)
+#   - Local `db` service is commented out
+#
+# PHASE 2 (Production): Migrate to local PostgreSQL (TimescaleDB).
+#   - Uncomment `db` service
+#   - Update DATABASE_URL to point to local db
+#   - See docs/DEPLOYMENT_PROXMOX.md for migration steps
+# ============================================================================
+
+services:
+  # --------------------------------------------------------------------------
+  # APPLICATION (FastAPI)
+  # --------------------------------------------------------------------------
+  app:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    container_name: okx-trading-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../../.env
+    environment:
+      - APP_ENV=production
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - app-data:/app/data
+      - app-models:/app/models
+      - app-logs:/app/logs
+    networks:
+      - okx-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # --------------------------------------------------------------------------
+  # TELEGRAM BOT (Polling mode - outbound only, no port forwarding needed)
+  # --------------------------------------------------------------------------
+  telegram-bot:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    container_name: okx-trading-telegram
+    restart: unless-stopped
+    command: ["python", "scripts/run_telegram_bot.py"]
+    env_file:
+      - ../../.env
+    environment:
+      - APP_ENV=production
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - app-data:/app/data
+      - app-models:/app/models
+      - app-logs:/app/logs
+    networks:
+      - okx-network
+
+  # --------------------------------------------------------------------------
+  # WORKER (Background tasks - Phase 3+)
+  # --------------------------------------------------------------------------
+  # NOTE: Disabled until okx_trading.workers.research_worker module exists.
+  # Uncomment when the worker module is implemented (Phase 3+).
+  #
+  # worker:
+  #   build:
+  #     context: ../..
+  #     dockerfile: deploy/docker/Dockerfile
+  #   container_name: okx-trading-worker
+  #   restart: unless-stopped
+  #   command: ["python", "-m", "okx_trading.workers.research_worker"]
+  #   env_file:
+  #     - ../../.env
+  #   environment:
+  #     - APP_ENV=production
+  #     - REDIS_URL=redis://redis:6379/0
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+  #   volumes:
+  #     - app-data:/app/data
+  #     - app-models:/app/models
+  #     - app-logs:/app/logs
+  #   networks:
+  #     - okx-network
+
+  # --------------------------------------------------------------------------
+  # DATABASE (PostgreSQL + TimescaleDB) - PHASE 2 ONLY
+  # --------------------------------------------------------------------------
+  # Uncomment this service when migrating from Supabase to local PostgreSQL.
+  # See docs/DEPLOYMENT_PROXMOX.md Section "Migrasi ke Local PostgreSQL".
+  #
+  # db:
+  #   image: timescale/timescaledb:latest-pg15
+  #   container_name: okx-trading-db
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_DB: ${DB_NAME:-okx_trading}
+  #     POSTGRES_USER: ${DB_USER:-okx_user}
+  #     POSTGRES_PASSWORD: ${DB_PASSWORD}
+  #     POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+  #   volumes:
+  #     - pgdata:/var/lib/postgresql/data
+  #     - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  #   ports:
+  #     - "127.0.0.1:5432:5432"  # Only accessible from localhost
+  #   networks:
+  #     - okx-network
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-okx_user} -d ${DB_NAME:-okx_trading}"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #     start_period: 10s
+
+  # --------------------------------------------------------------------------
+  # REDIS (Cache + Task Queue - Phase 3+)
+  # --------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: okx-trading-redis
+    restart: unless-stopped
+    # Handle empty REDIS_PASSWORD gracefully (no --requirepass flag)
+    command: redis-server --appendonly yes ${REDIS_PASSWORD:+--requirepass $REDIS_PASSWORD}
+    volumes:
+      - redisdata:/data
+    ports:
+      - "127.0.0.1:6379:6379"  # Only accessible from localhost
+    networks:
+      - okx-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --------------------------------------------------------------------------
+  # NGINX (Reverse Proxy - Optional, for API access from outside)
+  # --------------------------------------------------------------------------
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: okx-trading-nginx
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
+  #     - ./certs:/etc/nginx/certs:ro
+  #   depends_on:
+  #     - app
+  #   networks:
+  #     - okx-network
+
+# ----------------------------------------------------------------------------
+# VOLUMES
+# ----------------------------------------------------------------------------
+volumes:
+  # pgdata:  # Phase 2: uncomment when using local PostgreSQL
+  #   driver: local
+  redisdata:
+    driver: local
+  app-data:
+    driver: local
+  app-models:
+    driver: local
+  app-logs:
+    driver: local
+
+# ----------------------------------------------------------------------------
+# NETWORKS
+# ----------------------------------------------------------------------------
+networks:
+  okx-network:
+    driver: bridge
