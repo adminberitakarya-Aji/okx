@@ -393,7 +393,8 @@ def _compute_market_state_features(
 ) -> pd.DataFrame:
     """Compute Market State features (F-MKT) from candle data."""
 
-    features = pd.DataFrame()
+    # Initialize with index to avoid NaN when assigning scalars before series
+    features = pd.DataFrame(index=df.index)
     features["market_id"] = market_id
     features["exchange_id"] = exchange_id
     features["timestamp"] = df["timestamp"]

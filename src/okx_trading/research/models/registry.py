@@ -34,6 +34,7 @@ import structlog
 
 from okx_trading.research.models.trainer import (
     ModelConfig,
+    ModelFamily,
     ModelStatus,
     ModelType,
     TrainedModel,
@@ -98,7 +99,7 @@ class RegistryEntry:
     def from_dict(cls, data: dict[str, Any]) -> RegistryEntry:
         config = ModelConfig(
             model_type=ModelType(data["config"]["model_type"]),
-            model_family=data["config"]["model_family"],
+            model_family=ModelFamily(data["config"]["model_family"]),
             feature_version=data["config"]["feature_version"],
             label_version=data["config"]["label_version"],
             dataset_version=data["config"]["dataset_version"],

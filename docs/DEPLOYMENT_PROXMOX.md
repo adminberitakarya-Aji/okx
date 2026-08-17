@@ -444,6 +444,41 @@ docker logs --tail 100 okx-trading-app
 docker inspect okx-trading-app | grep -A5 Environment
 ```
 
+### DNS ISP memblokir api.binance.com / api.bybit.com (Indonesia)
+
+Beberapa ISP Indonesia (IndiHome, Biznet, dll.) melakukan **DNS sinkhole** pada domain exchange crypto.
+Gejala: `curl https://api.binance.com` timeout, tapi browser bisa akses (browser pakai DoH).
+
+**Solusi 1: Fallback otomatis (sudah built-in)**
+
+Client ingestion sudah punya fallback otomatis:
+- **Binance**: `api.binance.com` → `data-api.binance.vision` (market data only, AWS CDN)
+- **Bybit**: `api.bybit.com` → `api.bytick.com` → `api.bybit.global`
+
+Tidak perlu konfigurasi tambahan — client akan otomatis switch saat primary endpoint unreachable.
+
+**Solusi 2: Cloudflare WARP (untuk trading API)**
+
+`data-api.binance.vision` hanya untuk **market data** (candles). Untuk **trading API** (order, balance),
+tetap butuh `api.binance.com`. Gunakan Cloudflare WARP (lihat Section 3.4).
+
+**Verifikasi:**
+
+```bash
+# Test DNS resolution
+nslookup api.binance.com
+nslookup data-api.binance.vision
+
+# Test connectivity
+curl -s --connect-timeout 5 https://data-api.binance.vision/api/v3/ping && echo "OK"
+curl -s --connect-timeout 5 https://api.bytick.com/v5/market/time && echo "OK"
+```
+
+**Catatan penting:**
+- `data-api.binance.vision` = market data ONLY (klines, ticker, depth)
+- `api.binance.com` = trading API (orders, account, websocket trading)
+- Untuk ML pipeline (ingestion), fallback ke `data-api.binance.vision` sudah cukup
+
 ---
 
 ## 11. Checklist Deployment
