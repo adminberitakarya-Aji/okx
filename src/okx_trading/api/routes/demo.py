@@ -30,7 +30,11 @@ from okx_trading.api.schemas.demo import (
     MonitoringDashboardResponse,
     MonitoringSummaryResponse,
 )
-from okx_trading.application.services.demo_trading import DemoTradingError, DemoTradingService
+from okx_trading.application.services.demo_trading import (
+    DemoGridSession,
+    DemoTradingError,
+    DemoTradingService,
+)
 from okx_trading.application.services.monitoring import AlertRule, AlertSeverity, MonitoringService
 
 logger = structlog.get_logger()
@@ -74,13 +78,8 @@ def set_monitoring_service(service: MonitoringService) -> None:
     _monitoring_service = service
 
 
-def _session_to_response(session: object) -> DemoSessionResponse:
+def _session_to_response(session: DemoGridSession) -> DemoSessionResponse:
     """Convert DemoGridSession to response schema."""
-    from okx_trading.application.services.demo_trading import DemoGridSession
-
-    if not isinstance(session, DemoGridSession):
-        raise ValueError("Invalid session type")
-
     metrics_data = session.metrics.to_dict()
     metrics = DemoMetricsResponse(**metrics_data)
 
@@ -135,7 +134,7 @@ async def start_demo_session(session_id: str) -> DemoSessionResponse:
     service = get_demo_service()
 
     try:
-        session = service.start_demo_grid(session_id)
+        session = await service.start_demo_grid(session_id)
         return _session_to_response(session)
     except DemoTradingError as e:
         raise HTTPException(status_code=400, detail=e.message) from e
