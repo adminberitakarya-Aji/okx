@@ -115,7 +115,7 @@ DEFAULT_MARKETS = [
     "AVAX-USDT",
     "DOT-USDT",
     "LINK-USDT",
-    "MATIC-USDT",
+    "POL-USDT",
 ]
 DEFAULT_MONTHS = 6
 DEFAULT_EXCHANGE = "OKX"
@@ -635,22 +635,28 @@ def run_model_training(config: PipelineConfig) -> dict[str, Any]:
     }
 
     # Prepare features and labels
-    feature_columns = [
-        col
-        for col in dataset.columns
-        if col
-        not in [
-            "market_id",
-            "exchange_id",
-            "timestamp",
-            "positive_pnl",
-            "net_pnl_return",
-            "max_drawdown",
-            "capital_utilization",
-            "recovered",
-            "capital_exhausted",
-        ]
-    ]
+    # Exclude ID columns, label columns, and metadata columns from features
+    non_feature_columns = {
+        # ID/identity columns
+        "market_id",
+        "exchange_id",
+        "timestamp",
+        "blueprint_id",
+        "horizon",
+        # Label columns
+        "positive_pnl",
+        "net_pnl_return",
+        "max_drawdown",
+        "capital_utilization",
+        "recovered",
+        "capital_exhausted",
+        # Label metadata columns
+        "recovery_censored",
+        "max_section_depth",
+        "label_version",
+        "simulator_version",
+    }
+    feature_columns = [col for col in dataset.columns if col not in non_feature_columns]
 
     X = dataset[feature_columns].values.astype(np.float64)
     timestamps = dataset["timestamp"].values

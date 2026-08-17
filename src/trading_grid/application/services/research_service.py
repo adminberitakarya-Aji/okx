@@ -74,7 +74,7 @@ DEFAULT_MARKETS: list[MarketId] = [
     "AVAX-USDT",
     "DOT-USDT",
     "LINK-USDT",
-    "MATIC-USDT",
+    "POL-USDT",
 ]
 
 
