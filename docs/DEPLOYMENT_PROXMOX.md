@@ -70,8 +70,8 @@ pveam list local
 ### 3.2 Buat LXC Container
 
 ```bash
-# Buat container ID 100
-pct create 100 local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst \
+# Buat container ID 105
+pct create 105 local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst \
   --hostname okx-trading \
   --cores 2 \
   --memory 2048 \
@@ -83,10 +83,10 @@ pct create 100 local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst \
   --ostype ubuntu
 
 # Start container
-pct start 100
+pct start 105
 
 # Masuk ke container
-pct enter 100
+pct enter 105
 ```
 
 ### 3.3 Setup Dasar Ubuntu
@@ -96,10 +96,48 @@ pct enter 100
 apt update && apt upgrade -y
 
 # Install dasar
-apt install -y curl git nano htop
+apt install -y curl git nano htop gpg
 
 # Set timezone (opsional)
 timedatectl set-timezone Asia/Jakarta
+```
+
+### 3.4 Setup Cloudflare WARP (Bypass Blokir DNS ISP / TrustPositif)
+
+Agar container dapat mengakses API OKX, Binance, dan Bybit tanpa terhalang DNS sinkhole ISP Indonesia:
+
+**Langkah A: Di Proxmox Host (Aktifkan TUN Device untuk LXC 105)**
+```bash
+# Di shell Proxmox host, tambahkan konfigurasi TUN device ke LXC 105
+cat << 'EOF' >> /etc/pve/lxc/105.conf
+lxc.cgroup2.devices.allow: c 10:200 rwm
+lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
+EOF
+
+# Restart LXC 105
+pct reboot 105
+```
+
+**Langkah B: Di Dalam LXC 105 (Install & Connect WARP)**
+```bash
+pct enter 105
+
+# 1. Tambahkan repository Cloudflare Client
+curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ noble main" | tee /etc/apt/sources.list.d/cloudflare-client.list
+
+# 2. Install cloudflare-warp
+apt update && apt install -y cloudflare-warp
+
+# 3. Registrasi & Connect
+warp-cli registration new
+warp-cli mode warp
+warp-cli connect
+
+# 4. Verifikasi status
+warp-cli status
+curl https://www.cloudflare.com/cdn-cgi/trace | grep warp
+# Output yang benar: warp=on
 ```
 
 ---
@@ -411,7 +449,9 @@ docker inspect okx-trading-app | grep -A5 Environment
 ## 11. Checklist Deployment
 
 ```text
-☑ LXC container dibuat (Ubuntu 24.04)
+☑ LXC container dibuat ID 105 (Ubuntu 24.04)
+☑ TUN device diizinkan di Proxmox host (/etc/pve/lxc/105.conf)
+☑ Cloudflare WARP terinstall & status Connected (warp=on)
 ☑ Docker + Docker Compose terinstall
 ☑ Repository cloned
 ☑ .env dikonfigurasi (semua credentials)

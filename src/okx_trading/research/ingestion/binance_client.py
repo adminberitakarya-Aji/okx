@@ -39,6 +39,12 @@ logger = structlog.get_logger()
 
 # Binance API constants
 BINANCE_BASE_URL = "https://api.binance.com"
+BINANCE_FALLBACK_URLS = [
+    "https://data-api.binance.vision",
+    "https://api1.binance.com",
+    "https://api2.binance.com",
+    "https://api3.binance.com",
+]
 KLINES_ENDPOINT = "/api/v3/klines"
 MAX_KLINES_PER_REQUEST = 1000
 
@@ -112,6 +118,7 @@ class BinanceHistoricalClient:
 
     This client:
     - Uses only public endpoints (no authentication)
+    - Supports automatic fallback to mirror endpoints (e.g. data-api.binance.vision)
     - Handles rate limiting with token bucket + exponential backoff
     - Paginates through historical data automatically
     - Validates data integrity (gaps, duplicates)
@@ -129,6 +136,7 @@ class BinanceHistoricalClient:
     def __init__(
         self,
         base_url: str = BINANCE_BASE_URL,
+        fallback_urls: list[str] | None = None,
         timeout: float = 30.0,
         max_retries: int = 5,
     ) -> None:
@@ -136,22 +144,35 @@ class BinanceHistoricalClient:
         Initialize the Binance historical data client.
 
         Args:
-            base_url: Binance API base URL
+            base_url: Binance API base URL (default: https://api.binance.com)
+            fallback_urls: Optional list of fallback URLs to try if primary fails
             timeout: Request timeout in seconds
             max_retries: Maximum retry attempts for failed requests
         """
         self.base_url = base_url.rstrip("/")
+        if fallback_urls is not None:
+            self.fallback_urls = [u.rstrip("/") for u in fallback_urls]
+        else:
+            self.fallback_urls = [
+                u.rstrip("/") for u in BINANCE_FALLBACK_URLS if u.rstrip("/") != self.base_url
+            ]
+        self._endpoints = [self.base_url] + self.fallback_urls
+        self._current_endpoint_idx = 0
         self.timeout = timeout
         self.max_retries = max_retries
         self._client: httpx.AsyncClient | None = None
         self._last_request_time: float = 0.0
         self._lock = asyncio.Lock()
 
+    @property
+    def active_base_url(self) -> str:
+        """Get currently active base URL."""
+        return self._endpoints[self._current_endpoint_idx]
+
     async def __aenter__(self) -> BinanceHistoricalClient:
         """Enter async context."""
         self._client = httpx.AsyncClient(
-            base_url=self.base_url,
-            timeout=self.timeout,
+            timeout=httpx.Timeout(self.timeout, connect=5.0),
             headers={"User-Agent": "okx-trading-research/0.1.0"},
         )
         return self
@@ -179,7 +200,7 @@ class BinanceHistoricalClient:
     )
     async def _request(self, endpoint: str, params: dict[str, str]) -> list[list[Any]]:
         """
-        Make a rate-limited request to Binance API.
+        Make a rate-limited request to Binance API with automatic fallback.
 
         Args:
             endpoint: API endpoint path
@@ -197,7 +218,25 @@ class BinanceHistoricalClient:
         if self._client is None:
             raise RuntimeError("Client not initialized. Use 'async with' context manager.")
 
-        response = await self._client.get(endpoint, params=params)
+        # Try active endpoint and switch to fallback on TransportError
+        while True:
+            current_url = f"{self.active_base_url}{endpoint}"
+            try:
+                response = await self._client.get(current_url, params=params)
+                break
+            except httpx.TransportError as exc:
+                if self._current_endpoint_idx + 1 < len(self._endpoints):
+                    failed_url = self.active_base_url
+                    self._current_endpoint_idx += 1
+                    logger.warning(
+                        "binance_endpoint_unreachable_switching_to_fallback",
+                        failed_endpoint=failed_url,
+                        fallback_endpoint=self.active_base_url,
+                        error=str(exc),
+                    )
+                    continue
+                # All endpoints exhausted, raise for tenacity retry
+                raise
 
         if response.status_code == 429:
             raise BinanceRateLimitError("Binance rate limit exceeded (HTTP 429)")
