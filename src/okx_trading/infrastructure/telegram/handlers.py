@@ -982,7 +982,7 @@ async def callback_grid_start(callback: CallbackQuery) -> None:
         )
 
         # Start the grid (wires price monitor for autonomous execution)
-        session = container.demo_service.start_demo_grid(session.session_id)
+        session = await container.demo_service.start_demo_grid(session.session_id)
 
         await msg.edit_text(
             f"🚀 <b>Grid Started!</b>\n"

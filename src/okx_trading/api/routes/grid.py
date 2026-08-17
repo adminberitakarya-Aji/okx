@@ -106,7 +106,7 @@ async def start_grid(request: GridStartRequest) -> GridControlResponse:
             blueprint=blueprint,
             notes="Started via API",
         )
-        session = container.demo_service.start_demo_grid(session.session_id)
+        session = await container.demo_service.start_demo_grid(session.session_id)
     except Exception as e:
         logger.error("grid_start_failed", blueprint_id=request.blueprint_id, error=str(e))
         raise HTTPException(status_code=500, detail=f"Grid start failed: {e}") from e
