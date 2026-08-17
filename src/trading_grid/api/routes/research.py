@@ -147,6 +147,43 @@ async def get_market_research(market_id: str) -> dict[str, Any]:
     }
 
 
+@router.post("/reload-models", response_model=OperationResponse)
+async def reload_models() -> OperationResponse:
+    """
+    Reload deployed ML models from the registry.
+
+    Call this after training/promoting new models to activate them
+    without restarting the application. Enables hot-reload of ML models.
+    """
+    container = get_default_container()
+    service = container.research_service
+
+    operation_id = f"OP-RELOAD-MODELS-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
+
+    try:
+        ml_available = service.reload_models()
+        status: OperationStatus = "SUCCEEDED"
+        logger.info(
+            "models_reloaded",
+            operation_id=operation_id,
+            ml_available=ml_available,
+        )
+    except Exception as e:
+        logger.error("model_reload_failed", operation_id=operation_id, error=str(e))
+        status = "FAILED"
+
+    return OperationResponse(
+        operation_id=operation_id,
+        command_type="RELOAD_MODELS",
+        status=status,
+        created_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
+        environment="production",
+        resource_type="models",
+        resource_id="deployed",
+    )
+
+
 @router.post("/runs", response_model=OperationResponse, status_code=202)
 async def create_research_run(request: ResearchRunRequest) -> OperationResponse:
     """

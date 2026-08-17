@@ -83,6 +83,39 @@ services:
       start_period: 10s
 
   # --------------------------------------------------------------------------
+  # ML SCHEDULER (Automated retraining - 24/7)
+  # --------------------------------------------------------------------------
+  # Runs APScheduler with:
+  #   - Weekly data refresh: Sunday 02:00 UTC
+  #   - Monthly full retraining: 1st of month 03:00 UTC
+  #   - Weekly evaluation report: Monday 08:00 UTC
+  # Shares app-data and app-models volumes so new models are available
+  # to app and telegram-bot services.
+  ml-scheduler:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    container_name: trading-grid-ml-scheduler
+    restart: unless-stopped
+    command: ["python", "scripts/run_ml_scheduler.py"]
+    env_file:
+      - ../../.env
+    environment:
+      - APP_ENV=production
+    volumes:
+      - app-data:/app/data
+      - app-models:/app/models
+      - app-logs:/app/logs
+    networks:
+      - trading-grid-network
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import sys; sys.exit(0)'"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # --------------------------------------------------------------------------
   # WORKER (Background tasks - Phase 3+)
   # --------------------------------------------------------------------------
   # NOTE: Disabled until trading_grid.workers.research_worker module exists.

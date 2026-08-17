@@ -40,8 +40,12 @@ logger = structlog.get_logger()
 # Configuration
 SCRIPT_DIR = Path(__file__).parent
 ML_TRAINING_SCRIPT = SCRIPT_DIR / "run_ml_training.py"
-DEFAULT_MARKETS = "BTC-USDT,ETH-USDT,SOL-USDT,XRP-USDT,DOGE-USDT"
+DEFAULT_MARKETS = (
+    "BTC-USDT,ETH-USDT,SOL-USDT,XRP-USDT,DOGE-USDT,"
+    "ADA-USDT,AVAX-USDT,DOT-USDT,LINK-USDT,POL-USDT"
+)
 DEFAULT_MONTHS = 6
+DEFAULT_EXCHANGE = "BINANCE"
 
 
 def run_pipeline_command(args: list[str]) -> tuple[bool, str]:
@@ -93,6 +97,8 @@ def job_weekly_data_refresh() -> None:
             DEFAULT_MARKETS,
             "--months",
             "1",  # Only fetch last month for refresh
+            "--exchange",
+            DEFAULT_EXCHANGE,
         ]
     )
 
@@ -127,6 +133,8 @@ def job_monthly_retraining() -> None:
             DEFAULT_MARKETS,
             "--months",
             str(DEFAULT_MONTHS),
+            "--exchange",
+            DEFAULT_EXCHANGE,
         ]
     )
 
@@ -147,7 +155,7 @@ def job_model_evaluation_report() -> None:
     """
     logger.info("job_model_evaluation_report_started")
 
-    success, output = run_pipeline_command(["--status"])
+    success, output = run_pipeline_command(["--status", "--exchange", DEFAULT_EXCHANGE])
 
     if success:
         logger.info("job_model_evaluation_report_completed")

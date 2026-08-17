@@ -7,30 +7,48 @@ Panduan lengkap untuk deploy sistem ke **Proxmox home server** menggunakan **LXC
 ## 1. Arsitektur
 
 ```text
-┌─────────────────────────────────────────────────┐
-│              PROXMOX HOME SERVER                │
-│                                                 │
-│  ┌───────────────────────────────────────────┐  │
-│  │  LXC: "trading-grid" (Ubuntu 24.04)        │  │
-│  │                                           │  │
-│  │  Docker Compose:                          │  │
-│  │  ┌─────────────┐  ┌─────────────┐        │  │
-│  │  │ telegram-bot│  │ app (API)   │        │  │
-│  │  │  (polling)  │  │  :8000      │        │  │
-│  │  └──────┬──────┘  └──────┬──────┘        │  │
-│  │         │                │               │  │
-│  │  ┌──────▼──────┐        │               │  │
-│  │  │  redis      │        │               │  │
-│  │  │  (cache)    │        │               │  │
-│  │  └─────────────┘        │               │  │
-│  └─────────────────────────┼───────────────┘  │
-└────────────────────────────┼──────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                  PROXMOX HOME SERVER                     │
+│                                                          │
+│  ┌────────────────────────────────────────────────────┐  │
+│  │  LXC: "trading-grid" (Ubuntu 24.04)                │  │
+│  │                                                    │  │
+│  │  Docker Compose:                                   │  │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌──────────────┐ │  │
+│  │  │ telegram-bot│ │ app (API)   │ │ ml-scheduler │ │  │
+│  │  │  (polling)  │ │  :8000      │ │ (APScheduler)│ │  │
+│  │  └──────┬──────┘ └──────┬──────┘ └──────┬───────┘ │  │
+│  │         │               │               │         │  │
+│  │         └───────────────┼───────────────┘         │  │
+│  │                         │                         │  │
+│  │  ┌──────────────┐  ┌────▼──────────────────────┐  │  │
+│  │  │  redis       │  │  Shared Volumes:          │  │  │
+│  │  │  (cache)     │  │  app-data, app-models     │  │  │
+│  │  └──────────────┘  └───────────────────────────┘  │  │
+│  └────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────┘
                              │
               ┌──────────────▼──────────────┐
               │  SUPABASE (Cloud DB)        │
               │  PostgreSQL 15              │
               │  (Phase 1: Beta Trial)      │
               └─────────────────────────────┘
+```
+
+### ML Scheduler (24/7 Automated Retraining)
+
+Service `ml-scheduler` menjalankan APScheduler untuk retraining otomatis:
+
+| Job | Schedule | Deskripsi |
+|-----|----------|-----------|
+| Weekly Data Refresh | Minggu 02:00 UTC | Fetch candles baru (1 bulan terakhir) |
+| Monthly Retraining | Tanggal 1, 03:00 UTC | Full pipeline: ingest → features → simulate → train → promote |
+| Weekly Evaluation Report | Senin 08:00 UTC | Report status model ke admin |
+
+Setelah retraining, model baru otomatis tersedia di shared volume `app-models`.
+Untuk mengaktifkan model baru tanpa restart, panggil API:
+```bash
+curl -X POST http://localhost:8000/research/reload-models
 ```
 
 **Catatan:** Telegram bot menggunakan **polling mode** (koneksi outbound).
@@ -277,6 +295,9 @@ docker logs -f trading-grid-telegram
 
 # API saja
 docker logs -f trading-grid-app
+
+# ML Scheduler saja (retraining jobs)
+docker logs -f trading-grid-ml-scheduler
 ```
 
 ### Restart
@@ -287,6 +308,22 @@ docker compose --env-file /opt/okx/.env -f deploy/docker/docker-compose.prod.yml
 
 # Restart telegram bot saja
 docker restart trading-grid-telegram
+
+# Restart ML scheduler saja
+docker restart trading-grid-ml-scheduler
+```
+
+### ML Model Management
+
+```bash
+# Cek status ML pipeline & models
+docker exec trading-grid-ml-scheduler python scripts/run_ml_training.py --status --exchange BINANCE
+
+# Reload model baru tanpa restart app (setelah retraining)
+curl -X POST http://localhost:8000/research/reload-models
+
+# Manual retraining (jika perlu)
+docker exec trading-grid-ml-scheduler python scripts/run_ml_training.py --full --exchange BINANCE
 ```
 
 ### Update
@@ -491,9 +528,11 @@ curl -s --connect-timeout 5 https://api.bytick.com/v5/market/time && echo "OK"
 ☑ Repository cloned
 ☑ .env dikonfigurasi (semua credentials)
 ☑ Images built
-☑ Semua services running
+☑ Semua services running (app, telegram-bot, ml-scheduler, redis)
 ☑ API health check OK
 ☑ Telegram bot merespons /start
+☑ ML scheduler running (cek: docker logs trading-grid-ml-scheduler)
+☑ ML models tersedia di volume app-models
 ☑ Open access mode aktif (beta trial)
 ☑ Backup strategy disiapkan
 ```
