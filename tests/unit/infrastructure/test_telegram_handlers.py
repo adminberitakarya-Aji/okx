@@ -675,7 +675,7 @@ class TestCallbackGridStart:
 
         mock_container = MagicMock()
         mock_container.demo_service.create_demo_grid.return_value = session
-        mock_container.demo_service.start_demo_grid.return_value = session
+        mock_container.demo_service.start_demo_grid = AsyncMock(return_value=session)
 
         mock_research = MagicMock()
         mock_research.get_blueprint.return_value = blueprint
@@ -797,7 +797,9 @@ class TestCallbackGridStart:
 
         mock_container = MagicMock()
         mock_container.demo_service.create_demo_grid.return_value = session
-        mock_container.demo_service.start_demo_grid.side_effect = Exception("Grid already running")
+        mock_container.demo_service.start_demo_grid = AsyncMock(
+            side_effect=Exception("Grid already running")
+        )
 
         mock_research = MagicMock()
         mock_research.get_blueprint.return_value = blueprint
@@ -831,7 +833,7 @@ class TestCallbackGridStart:
 
         mock_container = MagicMock()
         mock_container.demo_service.create_demo_grid.return_value = session
-        mock_container.demo_service.start_demo_grid.return_value = session
+        mock_container.demo_service.start_demo_grid = AsyncMock(return_value=session)
 
         mock_research = MagicMock()
         mock_research.get_blueprint.return_value = blueprint
@@ -859,7 +861,7 @@ class TestCallbackGridStart:
 
         mock_container = MagicMock()
         mock_container.demo_service.create_demo_grid.return_value = session
-        mock_container.demo_service.start_demo_grid.return_value = session
+        mock_container.demo_service.start_demo_grid = AsyncMock(return_value=session)
 
         mock_research = MagicMock()
         mock_research.get_blueprint.return_value = blueprint
@@ -964,7 +966,7 @@ class TestCallbackGridStart:
 
         session = _make_session(session_id="SESSION-NEW", grid_id="GRID-NEW")
         mock_container.demo_service.create_demo_grid.return_value = session
-        mock_container.demo_service.start_demo_grid.return_value = session
+        mock_container.demo_service.start_demo_grid = AsyncMock(return_value=session)
 
         mock_blueprint = _make_blueprint(blueprint_id="BP-002", market_id="ETH-USDT")
 
@@ -993,7 +995,7 @@ class TestCallbackGridStart:
 
         session = _make_session(session_id="SESSION-NEW", grid_id="GRID-NEW")
         mock_container.demo_service.create_demo_grid.return_value = session
-        mock_container.demo_service.start_demo_grid.return_value = session
+        mock_container.demo_service.start_demo_grid = AsyncMock(return_value=session)
 
         mock_blueprint = _make_blueprint(blueprint_id="BP-TEST-001")
 
