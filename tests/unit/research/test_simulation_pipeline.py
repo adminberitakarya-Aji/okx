@@ -485,9 +485,7 @@ class TestPipelineIntegration:
         )
 
         # Get future candles
-        future_candles = candles[
-            observation_index + 1 : observation_index + 1 + horizon_candles
-        ]
+        future_candles = candles[observation_index + 1 : observation_index + 1 + horizon_candles]
 
         # Run simulation
         from trading_grid.research.simulator.grid_simulator import (

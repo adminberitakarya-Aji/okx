@@ -115,9 +115,7 @@ class SimulationLabelPipelineConfig:
     slippage_pct: float = 0.0005
 
     # Blueprint configuration
-    blueprint_config: ResearchBlueprintConfig = field(
-        default_factory=ResearchBlueprintConfig
-    )
+    blueprint_config: ResearchBlueprintConfig = field(default_factory=ResearchBlueprintConfig)
 
     # Maximum observations per market (None = unlimited)
     max_observations_per_market: int | None = None
@@ -303,9 +301,7 @@ class ResearchBlueprintGenerator:
                 grid_count=self.config.grids_per_section,
                 grid_spacing_pct=spacing,
                 capital_allocation_pct=capital_pct,
-                gap_to_next_pct=(
-                    self.config.section_gap_pct if i < section_count - 1 else None
-                ),
+                gap_to_next_pct=(self.config.section_gap_pct if i < section_count - 1 else None),
             )
             sections.append(section)
 
@@ -336,9 +332,7 @@ class SimulationLabelPipeline:
     ) -> None:
         self.storage = storage
         self.config = config or SimulationLabelPipelineConfig()
-        self.blueprint_generator = ResearchBlueprintGenerator(
-            self.config.blueprint_config
-        )
+        self.blueprint_generator = ResearchBlueprintGenerator(self.config.blueprint_config)
         self.label_generator = LabelGenerator(
             universe_snapshot_id=f"universe-{datetime.now(UTC).strftime('%Y%m')}",
             label_version=self.config.label_version,
@@ -383,9 +377,7 @@ class SimulationLabelPipeline:
                 results.valid_labels += market_results.valid_labels
                 results.invalid_simulations += market_results.invalid_simulations
                 results.failed_simulations += market_results.failed_simulations
-                results.observations_per_market[market_id] = (
-                    market_results.total_observations
-                )
+                results.observations_per_market[market_id] = market_results.total_observations
                 results.label_sets.extend(market_results.label_sets)
                 results.errors.extend(market_results.errors)
 
@@ -443,9 +435,7 @@ class SimulationLabelPipeline:
 
         # Limit observations if configured
         if self.config.max_observations_per_market:
-            observation_indices = observation_indices[
-                : self.config.max_observations_per_market
-            ]
+            observation_indices = observation_indices[: self.config.max_observations_per_market]
 
         logger.info(
             "market_simulation_started",
@@ -513,9 +503,7 @@ class SimulationLabelPipeline:
         )
 
         # Future candles for simulation (T+1 to T+horizon)
-        future_candles = candles[
-            observation_index + 1 : observation_index + 1 + horizon_candles
-        ]
+        future_candles = candles[observation_index + 1 : observation_index + 1 + horizon_candles]
 
         # Configure simulation
         sim_config = SimulationConfig(
@@ -569,10 +557,7 @@ class SimulationLabelPipeline:
         closes = [float(c.close) for c in window_candles]
 
         # Compute returns
-        returns = [
-            (closes[i] - closes[i - 1]) / closes[i - 1]
-            for i in range(1, len(closes))
-        ]
+        returns = [(closes[i] - closes[i - 1]) / closes[i - 1] for i in range(1, len(closes))]
 
         if not returns:
             return 0.02

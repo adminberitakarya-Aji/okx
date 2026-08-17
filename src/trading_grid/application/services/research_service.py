@@ -223,9 +223,7 @@ class ResearchService:
         self._load_deployed_models()
         return self._ml_available
 
-    def _compute_features_from_candles(
-        self, candles: list[Any]
-    ) -> dict[str, float] | None:
+    def _compute_features_from_candles(self, candles: list[Any]) -> dict[str, float] | None:
         """
         Compute ML features from candle data for inference.
 
