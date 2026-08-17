@@ -472,11 +472,12 @@ Implement end-to-end ML training pipeline to produce production-ready models for
 ## Milestones
 
 ```text
-M7.1: Data ingestion script fetches 6 months historical data    ✅ Done (2026-08-17)
-M7.2: Training orchestrator runs full pipeline                  ✅ Done (2026-08-17)
-M7.3: Initial model trained with ROC-AUC > 0.75                 ⬜ (pending pipeline run)
-M7.4: Model promoted to production (ResearchService ML mode)    ⬜ (pending M7.3)
-M7.5: Scheduled retraining active                               ⬜ (pending implementation)
+M7.1: Data ingestion script created                             ✅ Done (2026-08-17)
+M7.2: Training orchestrator created                             ✅ Done (2026-08-17)
+M7.3: Data ingestion runs successfully (6 months data)          ⬜ (pending — OKX API unreachable)
+M7.4: Initial model trained with ROC-AUC > 0.75                 ⬜ (pending M7.3)
+M7.5: Model promoted to production (ResearchService ML mode)    ⬜ (pending M7.4)
+M7.6: Scheduled retraining active                               ⬜ (pending implementation)
 ```
 
 ## Go/No-Go Criteria
@@ -637,3 +638,4 @@ M8.5: Alert system active
 | 3.1 | 2026-08-17 | AI Engineer | Gap fixes: M3.11 execution loop wired (ServiceContainer + start_demo_grid + execute_level_trigger), Telegram menus wired (TOP 10, SIMULATE, GRID control, BLUEPRINT detail + START GRID), BlueprintGenerator + ResearchService added. M4.3/M4.4 remain ⬜ pending 7-day live run |
 | 3.2 | 2026-08-17 | AI Engineer | Added Phase 7 (ML Training Pipeline) and Phase 8 (Admin Dashboard). Added docs/ML_TRAINING_PIPELINE_SPEC.md and docs/ADMIN_DASHBOARD_SPEC.md. Updated roadmap overview and success criteria. |
 | 3.3 | 2026-08-17 | AI Engineer | Phase 7 Tasks 7.1-7.3 complete: scripts/run_ml_training.py created with full pipeline orchestration (ingest, features, simulate, train, evaluate, promote, status). M7.1 and M7.2 marked done. |
+| 3.4 | 2026-08-17 | AI Engineer | Phase 7 milestone correction: M7.1/M7.2 clarified as "script created" (not data fetched/model trained). Added M7.3 (data ingestion run), renumbered M7.4-M7.6. Initial model and scheduled retraining remain ⬜ pending OKX API access. |

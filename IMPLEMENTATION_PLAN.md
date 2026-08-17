@@ -710,13 +710,14 @@ workers/ (depends on application, research)
 
 ### Task 7.1: Data Ingestion Script ✅
 ```
-- [x] scripts/run_ml_training.py --ingest
-- [x] Fetch historical candles (6 months minimum)
+- [x] scripts/run_ml_training.py --ingest (script implemented)
+- [x] Fetch historical candles logic (implemented, NOT yet executed — OKX API unreachable)
 - [ ] Fetch order book snapshots (deferred - not available via public API)
 - [ ] Fetch ticker data (deferred)
-- [x] Store to Parquet with versioning
-- [x] Data completeness validation
+- [x] Store to Parquet with versioning (logic implemented)
+- [x] Data completeness validation (logic implemented)
 ```
+> **Note:** Actual data fetching is tracked in Task 7.4. Script exists but has not successfully run yet.
 
 ### Task 7.2: Training Orchestrator ✅
 ```
@@ -1165,3 +1166,4 @@ logger.info("order_submitted", order_id=order.id, market=market.id)
 | 1.3 | 2026-08-17 | AI Engineer | Updated all 228 checkboxes to reflect actual codebase status: Phase 0-2 fully complete, Phase 3 complete (incl. Price Monitor wiring), Phase 4 mostly complete (7-day run pending), Phase 5 complete except admin dashboard. Phase 6 remains unchecked. |
 | 1.4 | 2026-08-17 | AI Engineer | Added Phase 7 (ML Training Pipeline) and Phase 8 (Admin Dashboard). Added docs/ML_TRAINING_PIPELINE_SPEC.md and docs/ADMIN_DASHBOARD_SPEC.md. |
 | 1.5 | 2026-08-17 | AI Engineer | Phase 7 Tasks 7.1-7.3 complete: scripts/run_ml_training.py created with full pipeline orchestration (ingest, features, simulate, train, evaluate, promote, status). |
+| 1.6 | 2026-08-17 | AI Engineer | Phase 7 Task 7.1 clarification: checkboxes now distinguish "script implemented" vs "actually executed". Data fetching has NOT run yet (OKX API unreachable). Actual execution tracked in Task 7.4. |
