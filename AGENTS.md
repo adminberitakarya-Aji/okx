@@ -329,6 +329,8 @@ def test_simulator_is_deterministic():
 | `docs/SECURITY_AUTHORIZATION_SPEC.md` | Security model |
 | `docs/OKX_DEMO_TRADING_SPEC.md` | Demo environment |
 | `docs/LIVE_TRADING_SPEC.md` | Live operations |
+| `docs/ML_TRAINING_PIPELINE_SPEC.md` | ML training pipeline |
+| `docs/ADMIN_DASHBOARD_SPEC.md` | Admin dashboard |
 
 **When in doubt, read the relevant spec document first.**
 

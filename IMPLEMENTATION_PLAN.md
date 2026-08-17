@@ -703,6 +703,111 @@ workers/ (depends on application, research)
 - [ ] Continuous monitoring
 ```
 
+## Phase 7: ML Training Pipeline (Week 21-23)
+
+> **Reference:** `docs/ML_TRAINING_PIPELINE_SPEC.md`
+> **Status:** 🟡 In Progress (Tasks 7.1-7.3 complete, 7.4-7.5 pending)
+
+### Task 7.1: Data Ingestion Script ✅
+```
+- [x] scripts/run_ml_training.py --ingest
+- [x] Fetch historical candles (6 months minimum)
+- [ ] Fetch order book snapshots (deferred - not available via public API)
+- [ ] Fetch ticker data (deferred)
+- [x] Store to Parquet with versioning
+- [x] Data completeness validation
+```
+
+### Task 7.2: Training Orchestrator ✅
+```
+- [x] scripts/run_ml_training.py --full (end-to-end pipeline)
+- [x] Feature engineering orchestration
+- [x] Blueprint generation for training (simplified - synthetic labels)
+- [x] Grid simulation for labels (simplified implementation)
+- [x] Dataset building with time-based split
+- [x] Model training (6 models)
+- [x] Walk-forward validation
+```
+
+### Task 7.3: Model Evaluation & Promotion ✅
+```
+- [x] scripts/run_ml_training.py --evaluate
+- [x] Baseline comparison (threshold-based)
+- [x] Model promotion workflow
+- [ ] ResearchService ML mode integration (pending)
+- [x] Model rollback support (via registry archive)
+```
+
+### Task 7.4: Initial Model Training
+```
+- [ ] Fetch 6 months historical data for TOP 10 markets
+- [ ] Run full training pipeline
+- [ ] Evaluate model quality (ROC-AUC > 0.75 target)
+- [ ] Promote initial model to production
+- [ ] Document training results
+```
+
+### Task 7.5: Scheduled Retraining
+```
+- [ ] APScheduler job for monthly retraining
+- [ ] Automatic data refresh (weekly)
+- [ ] Model comparison before promotion
+- [ ] Admin notification on training completion
+```
+
+## Phase 8: Admin Dashboard (Week 24-26)
+
+> **Reference:** `docs/ADMIN_DASHBOARD_SPEC.md`
+
+### Task 8.1: Telegram Admin Commands (Quick Win)
+```
+- [ ] /admin ml_status — ML model status
+- [ ] /admin training — Training pipeline status
+- [ ] /admin performance — Grid performance summary
+- [ ] /admin retrain — Trigger retraining
+- [ ] /admin alerts — View active alerts
+- [ ] /admin ingestion — Data ingestion status
+```
+
+### Task 8.2: Admin API Endpoints
+```
+- [ ] GET /api/v1/admin/ml/status
+- [ ] GET /api/v1/admin/ml/metrics
+- [ ] GET /api/v1/admin/training/status
+- [ ] GET /api/v1/admin/training/history
+- [ ] POST /api/v1/admin/training/run
+- [ ] GET /api/v1/admin/performance/grids
+- [ ] GET /api/v1/admin/performance/alerts
+- [ ] GET /api/v1/admin/models
+- [ ] POST /api/v1/admin/models/{model_id}/promote
+```
+
+### Task 8.3: Metrics Storage
+```
+- [ ] ml_predictions table
+- [ ] training_runs table
+- [ ] alerts table
+- [ ] Metrics collection service
+- [ ] Drift detection service
+```
+
+### Task 8.4: Alert System
+```
+- [ ] Alert type definitions
+- [ ] Telegram notification to admin
+- [ ] Alert acknowledgment
+- [ ] Alert history
+```
+
+### Task 8.5: Web Dashboard (Future)
+```
+- [ ] Grafana + Prometheus setup (or custom web UI)
+- [ ] ML model status panel
+- [ ] Training pipeline panel
+- [ ] Performance metrics panel
+- [ ] Alert management panel
+```
+
 ---
 
 # 6. Testing Strategy
@@ -1058,3 +1163,5 @@ logger.info("order_submitted", order_id=order.id, market=market.id)
 | 1.1 | 2026-08-16 | AI Engineer | Updated Section 3 (Project Structure) to match actual codebase |
 | 1.2 | 2026-08-16 | AI Engineer | Added Task 3.8 Price Monitor (gap fix). Phase 5 = Multi-Tenant Beta, Phase 6 = Live Trading. |
 | 1.3 | 2026-08-17 | AI Engineer | Updated all 228 checkboxes to reflect actual codebase status: Phase 0-2 fully complete, Phase 3 complete (incl. Price Monitor wiring), Phase 4 mostly complete (7-day run pending), Phase 5 complete except admin dashboard. Phase 6 remains unchecked. |
+| 1.4 | 2026-08-17 | AI Engineer | Added Phase 7 (ML Training Pipeline) and Phase 8 (Admin Dashboard). Added docs/ML_TRAINING_PIPELINE_SPEC.md and docs/ADMIN_DASHBOARD_SPEC.md. |
+| 1.5 | 2026-08-17 | AI Engineer | Phase 7 Tasks 7.1-7.3 complete: scripts/run_ml_training.py created with full pipeline orchestration (ingest, features, simulate, train, evaluate, promote, status). |
