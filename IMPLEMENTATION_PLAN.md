@@ -393,7 +393,7 @@ workers/ (depends on application, research)
 - [x] Set up src layout
 - [x] Configure ruff, mypy
 - [x] Create Makefile with common commands
-- [ ] Set up pre-commit hooks
+- [~] Set up pre-commit hooks (Skipped — CI/CD sufficient)
 - [x] Create .env.example
 - [x] Create docker-compose.yml (app, db, redis)
 - [x] Create Dockerfile
@@ -455,7 +455,7 @@ workers/ (depends on application, research)
 - [x] Data validation (gaps, duplicates)
 - [x] research/ingestion/storage.py — Parquet storage
 - [x] Data versioning
-- [ ] Scripts: download_data.py
+- [~] Scripts: download_data.py (Consolidated into run_ml_training.py --ingest)
 ```
 
 ### Task 1.2: Market State Features
@@ -518,7 +518,7 @@ workers/ (depends on application, research)
 - [x] research/dataset/validation.py
 - [x] Causal integrity check
 - [x] Dataset metadata
-- [ ] Scripts: build_dataset.py
+- [~] Scripts: build_dataset.py (Consolidated into run_ml_training.py --full)
 ```
 
 ## Phase 2: ML Pipeline (Week 7-10)
@@ -593,12 +593,12 @@ workers/ (depends on application, research)
 
 ### Task 3.1: Application Services
 ```
-- [ ] application/commands/research.py (reserved — logic in services/)
-- [ ] application/commands/grid.py (reserved — logic in services/)
-- [ ] application/commands/system.py (reserved — logic in services/)
-- [ ] application/queries/research.py (reserved — logic in services/)
-- [ ] application/queries/grid.py (reserved — logic in services/)
-- [ ] application/queries/system.py (reserved — logic in services/)
+- [~] application/commands/research.py (N/A by design — logic in services/)
+- [~] application/commands/grid.py (N/A by design — logic in services/)
+- [~] application/commands/system.py (N/A by design — logic in services/)
+- [~] application/queries/research.py (N/A by design — logic in services/)
+- [~] application/queries/grid.py (N/A by design — logic in services/)
+- [~] application/queries/system.py (N/A by design — logic in services/)
 - [x] application/services/authorization.py
 - [x] application/services/approval.py
 - [x] application/services/audit.py
@@ -607,8 +607,8 @@ workers/ (depends on application, research)
 ### Task 3.2: REST API
 ```
 - [x] api/app.py — FastAPI factory
-- [ ] api/routes/research.py (not needed — Telegram is primary UI)
-- [ ] api/routes/grid.py (not needed — Telegram is primary UI)
+- [x] api/routes/research.py (implemented + POST /research/reload-models)
+- [x] api/routes/grid.py (implemented)
 - [x] api/routes/system.py
 - [x] api/routes/health.py
 - [x] api/middleware/auth.py
@@ -777,15 +777,15 @@ workers/ (depends on application, research)
 ## Phase 7: ML Training Pipeline (Week 21-23)
 
 > **Reference:** `docs/ML_TRAINING_PIPELINE_SPEC.md`
-> **Status:** 🟡 In Progress (Tasks 7.1-7.4 complete, 7.5 pending)
+> **Status:** 🟡 In Progress (Tasks 7.1-7.5 complete; admin notification pending)
 
 ### Task 7.1: Data Ingestion Script ✅
 ```
 - [x] scripts/run_ml_training.py --ingest (script implemented)
 - [x] Fetch historical candles logic (implemented, NOT yet executed — OKX API unreachable)
 - [x] Multi-exchange support: --exchange OKX|BINANCE|BYBIT (factory pattern)
-- [ ] Fetch order book snapshots (deferred - not available via public API)
-- [ ] Fetch ticker data (deferred)
+- [~] Fetch order book snapshots (Deferred — not available via public API)
+- [~] Fetch ticker data (Deferred)
 - [x] Store to Parquet with versioning (logic implemented, exchange-aware)
 - [x] Data completeness validation (logic implemented)
 ```
@@ -808,7 +808,7 @@ workers/ (depends on application, research)
 - [x] scripts/run_ml_training.py --evaluate
 - [x] Baseline comparison (threshold-based)
 - [x] Model promotion workflow
-- [ ] ResearchService ML mode integration (pending)
+- [x] ResearchService ML mode integration (verified + POST /research/reload-models)
 - [x] Model rollback support (via registry archive)
 ```
 
@@ -822,12 +822,12 @@ workers/ (depends on application, research)
 ```
 > **Note (2026-08-17):** OKX API unreachable due to DNS hijacking by ISP. Resolved via Binance public data API fallback (`data-api.binance.vision`). Feature engineering bug fixed (scalar assign to empty DataFrame → NaN). Registry bug fixed (model_family enum deserialization). Models promoted with `--force` since synthetic labels produce ~0.5 ROC-AUC (expected baseline). Real simulation labels needed for quality improvement.
 
-### Task 7.5: Scheduled Retraining
+### Task 7.5: Scheduled Retraining ✅
 ```
-- [ ] APScheduler job for monthly retraining
-- [ ] Automatic data refresh (weekly)
-- [ ] Model comparison before promotion
-- [ ] Admin notification on training completion
+- [x] APScheduler job for monthly retraining (ml-scheduler service deployed to Proxmox)
+- [x] Automatic data refresh (weekly — Sunday 02:00 UTC)
+- [x] Model comparison before promotion (via run_ml_training.py --evaluate)
+- [ ] Admin notification on training completion (TODO in code)
 ```
 
 ## Phase 8: Admin Dashboard (Week 24-26)
@@ -1242,3 +1242,4 @@ logger.info("order_submitted", order_id=order.id, market=market.id)
 | 1.5 | 2026-08-17 | AI Engineer | Phase 7 Tasks 7.1-7.3 complete: scripts/run_ml_training.py created with full pipeline orchestration (ingest, features, simulate, train, evaluate, promote, status). |
 | 1.6 | 2026-08-17 | AI Engineer | Phase 7 Task 7.1 clarification: checkboxes now distinguish "script implemented" vs "actually executed". Data fetching has NOT run yet (OKX API unreachable). Actual execution tracked in Task 7.4. |
 | 1.7 | 2026-08-17 | AI Engineer | Phase 7 Task 7.4 DONE: Data ingestion via Binance fallback (data-api.binance.vision) — 9/10 markets, 38,880 candles, 6 months. Feature engineering bug fixed (scalar assign to empty DataFrame → NaN). 6 LightGBM models trained (32,400 obs), evaluated, promoted to DEPLOYED (--force). Registry bug fixed (model_family enum deserialization). Val ROC-AUC ~0.53 (synthetic labels, expected). Task 7.5 (scheduled retraining) remains pending. |
+| 1.8 | 2026-08-18 | AI Engineer | Phase 7 Task 7.5 DONE: ml-scheduler service deployed to Proxmox (APScheduler, restart: unless-stopped). Weekly data refresh (Sun 02:00 UTC), monthly retraining (1st 03:00 UTC), weekly evaluation report (Mon 08:00 UTC). ResearchService ML mode verified + POST /research/reload-models endpoint added. Checklist audit: pre-commit hooks skipped (CI/CD sufficient), scripts consolidated, reserved commands/queries marked N/A, api/routes/research.py + grid.py marked done, deferred items marked. |

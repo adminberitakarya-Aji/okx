@@ -452,7 +452,7 @@ Implement end-to-end ML training pipeline to produce production-ready models for
 | Model evaluation | Baseline comparison, quality metrics | ✅ |
 | Model promotion | Promote models to production | ✅ |
 | Initial trained model | First production model (6 LightGBM models, DEPLOYED) | ✅ |
-| Scheduled retraining | Monthly automated retraining | ⬜ |
+| Scheduled retraining | Monthly automated retraining | ✅ |
 
 ## Implementation Details
 
@@ -477,8 +477,8 @@ M7.1: Data ingestion script created                             ✅ Done (2026-0
 M7.2: Training orchestrator created                             ✅ Done (2026-08-17)
 M7.3: Data ingestion runs successfully (6 months data)          ✅ Done (2026-08-17) — via Binance fallback (data-api.binance.vision), 9 markets, 38,880 candles
 M7.4: Initial model trained                                     ✅ Done (2026-08-17) — 6 LightGBM models trained (32,400 observations). Val ROC-AUC ~0.5 (synthetic labels, expected). Promoted with --force.
-M7.5: Model promoted to production (ResearchService ML mode)    🟡 Models DEPLOYED in registry. ResearchService ML mode integration pending.
-M7.6: Scheduled retraining active                               ⬜ (pending implementation)
+M7.5: Model promoted to production (ResearchService ML mode)    ✅ Models DEPLOYED. ResearchService ML mode active. POST /research/reload-models added.
+M7.6: Scheduled retraining active                               ✅ Done (2026-08-17) — ml-scheduler deployed to Proxmox
 ```
 
 ## Go/No-Go Criteria
@@ -641,3 +641,4 @@ M8.5: Alert system active
 | 3.3 | 2026-08-17 | AI Engineer | Phase 7 Tasks 7.1-7.3 complete: scripts/run_ml_training.py created with full pipeline orchestration (ingest, features, simulate, train, evaluate, promote, status). M7.1 and M7.2 marked done. |
 | 3.4 | 2026-08-17 | AI Engineer | Phase 7 milestone correction: M7.1/M7.2 clarified as "script created" (not data fetched/model trained). Added M7.3 (data ingestion run), renumbered M7.4-M7.6. Initial model and scheduled retraining remain ⬜ pending OKX API access. |
 | 3.5 | 2026-08-17 | AI Engineer | Phase 7 M7.3-M7.4 DONE: Data ingestion via Binance fallback (data-api.binance.vision) — 9 markets, 38,880 candles, 6 months. Feature engineering bug fixed (scalar assign to empty DataFrame). 6 LightGBM models trained (32,400 obs), evaluated, promoted to DEPLOYED. Registry bug fixed (model_family enum deserialization). Val ROC-AUC ~0.5 (synthetic labels, expected). ResearchService ML mode integration + scheduled retraining pending. |
+| 3.6 | 2026-08-18 | AI Engineer | Phase 7 M7.5-M7.6 DONE: ml-scheduler service deployed to Proxmox (APScheduler, restart: unless-stopped). Weekly data refresh (Sun 02:00 UTC), monthly retraining (1st 03:00 UTC), weekly evaluation report (Mon 08:00 UTC). ResearchService ML mode verified + POST /research/reload-models endpoint added. Phase 7 complete except admin notification. |
