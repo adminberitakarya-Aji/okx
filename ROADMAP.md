@@ -457,7 +457,8 @@ Implement end-to-end ML training pipeline to produce production-ready models for
 ## Implementation Details
 
 - `scripts/run_ml_training.py` (created 2026-08-17):
-  - `--ingest`: Fetch historical candles from OKX, store to Parquet with versioning
+  - `--ingest`: Fetch historical candles from OKX/Binance/Bybit, store to Parquet with versioning
+  - `--exchange OKX|BINANCE|BYBIT`: Multi-exchange support via `create_historical_client()` factory
   - `--features`: Compute Market State features (volatility, momentum, RSI, MACD, etc.)
   - `--simulate`: Generate labels (simplified synthetic approach; full GridSimulator integration pending)
   - `--train`: Train 6 models (Primary Classifier, Net P&L Regressor, Drawdown Regressor, Capital Utilization Regressor, Recovery Classifier, Capital Exhaustion Classifier)

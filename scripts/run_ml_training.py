@@ -26,7 +26,7 @@ Usage:
 Options:
     --markets BTC-USDT,ETH-USDT    Markets to process (default: TOP 10)
     --months 6                     Historical data period in months
-    --exchange OKX                 Exchange to fetch data from
+    --exchange OKX|BINANCE|BYBIT   Exchange to fetch data from (default: OKX)
     --interval 1H                  Candle interval
     --model-family lightgbm        Model family (lightgbm, gradient_boosting)
     --force                        Force operations (e.g., promote without thresholds)
@@ -45,11 +45,14 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
 import structlog
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from okx_trading.research.ingestion.binance_client import BinanceHistoricalClient
+from okx_trading.research.ingestion.bybit_client import BybitHistoricalClient
 from okx_trading.research.ingestion.okx_client import OKXHistoricalClient
 from okx_trading.research.ingestion.storage import ParquetStorage
 from okx_trading.research.models.registry import ModelRegistry, PromotionThresholds
@@ -62,6 +65,38 @@ from okx_trading.research.models.trainer import (
 )
 
 logger = structlog.get_logger()
+
+# Supported exchanges for data ingestion
+SUPPORTED_EXCHANGES = ("OKX", "BINANCE", "BYBIT")
+
+
+def create_historical_client(
+    exchange: str,
+) -> OKXHistoricalClient | BinanceHistoricalClient | BybitHistoricalClient:
+    """
+    Create the appropriate historical data client for the given exchange.
+
+    Args:
+        exchange: Exchange ID (OKX, BINANCE, BYBIT)
+
+    Returns:
+        Historical data client instance for the exchange
+
+    Raises:
+        ValueError: If exchange is not supported
+    """
+    exchange_upper = exchange.upper()
+    if exchange_upper == "OKX":
+        return OKXHistoricalClient()
+    elif exchange_upper == "BINANCE":
+        return BinanceHistoricalClient()
+    elif exchange_upper == "BYBIT":
+        return BybitHistoricalClient()
+    else:
+        raise ValueError(
+            f"Unsupported exchange: {exchange}. Supported: {', '.join(SUPPORTED_EXCHANGES)}"
+        )
+
 
 # Default configuration
 DEFAULT_MARKETS = [
@@ -204,9 +239,12 @@ async def run_data_ingestion(config: PipelineConfig) -> dict[str, Any]:
         "markets_processed": 0,
         "total_candles": 0,
         "errors": [],
+        "exchange": config.exchange,
     }
 
-    async with OKXHistoricalClient() as client:
+    # Create the appropriate client for the configured exchange (OKX/BINANCE/BYBIT)
+    client = create_historical_client(config.exchange)
+    async with client:
         for market_id in config.markets:
             try:
                 logger.info("ingesting_market", market_id=market_id)
@@ -269,7 +307,6 @@ def run_feature_engineering(config: PipelineConfig) -> dict[str, Any]:
     """
     logger.info("stage_2_feature_engineering_started", markets=config.markets)
 
-    import numpy as np
     import pandas as pd
 
     storage = ParquetStorage(
@@ -355,8 +392,6 @@ def _compute_market_state_features(
     df: pd.DataFrame, market_id: str, exchange_id: str
 ) -> pd.DataFrame:
     """Compute Market State features (F-MKT) from candle data."""
-    import numpy as np
-    import pandas as pd
 
     features = pd.DataFrame()
     features["market_id"] = market_id
@@ -511,9 +546,7 @@ def run_simulation_and_labels(config: PipelineConfig) -> dict[str, Any]:
         labels.loc[mask, "positive_pnl"] = positive_pnl
         labels.loc[mask, "net_pnl_return"] = net_pnl_return
         labels.loc[mask, "max_drawdown"] = max_drawdown
-        labels.loc[mask, "capital_utilization"] = np.random.uniform(
-            0.3, 0.9, len(market_features)
-        )
+        labels.loc[mask, "capital_utilization"] = np.random.uniform(0.3, 0.9, len(market_features))
         labels.loc[mask, "recovered"] = (np.random.random(len(market_features)) < 0.7).astype(int)
         labels.loc[mask, "capital_exhausted"] = (
             np.random.random(len(market_features)) < 0.05
@@ -527,9 +560,7 @@ def run_simulation_and_labels(config: PipelineConfig) -> dict[str, Any]:
     labels.to_parquet(labels_dir / "grid_labels.parquet", index=False)
 
     # Save dataset (features + labels joined)
-    dataset = features_df.merge(
-        labels, on=["market_id", "exchange_id", "timestamp"], how="inner"
-    )
+    dataset = features_df.merge(labels, on=["market_id", "exchange_id", "timestamp"], how="inner")
     dataset_dir = Path(config.data_dir) / "dataset"
     dataset_dir.mkdir(parents=True, exist_ok=True)
     dataset.to_parquet(dataset_dir / "training_dataset.parquet", index=False)
@@ -607,8 +638,8 @@ def run_model_training(config: PipelineConfig) -> dict[str, Any]:
     split_idx_1 = int(len(X) * 0.7)  # Train: 70%
     split_idx_2 = int(len(X) * 0.85)  # Validation: 15%, Test: 15%
 
-    X_train, X_val, X_test = X[:split_idx_1], X[split_idx_1:split_idx_2], X[split_idx_2:]
-    ts_train, ts_val, ts_test = (
+    X_train, X_val, _X_test = X[:split_idx_1], X[split_idx_1:split_idx_2], X[split_idx_2:]
+    _ts_train, _ts_val, _ts_test = (
         timestamps[:split_idx_1],
         timestamps[split_idx_1:split_idx_2],
         timestamps[split_idx_2:],
@@ -1036,7 +1067,13 @@ Examples:
     parser.add_argument(
         "--months", type=int, default=DEFAULT_MONTHS, help="Historical data period in months"
     )
-    parser.add_argument("--exchange", type=str, default=DEFAULT_EXCHANGE, help="Exchange ID")
+    parser.add_argument(
+        "--exchange",
+        type=str,
+        default=DEFAULT_EXCHANGE,
+        choices=["OKX", "BINANCE", "BYBIT"],
+        help="Exchange to fetch data from (OKX, BINANCE, BYBIT)",
+    )
     parser.add_argument("--interval", type=str, default=DEFAULT_INTERVAL, help="Candle interval")
     parser.add_argument(
         "--model-family",

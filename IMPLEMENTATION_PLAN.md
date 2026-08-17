@@ -712,12 +712,14 @@ workers/ (depends on application, research)
 ```
 - [x] scripts/run_ml_training.py --ingest (script implemented)
 - [x] Fetch historical candles logic (implemented, NOT yet executed — OKX API unreachable)
+- [x] Multi-exchange support: --exchange OKX|BINANCE|BYBIT (factory pattern)
 - [ ] Fetch order book snapshots (deferred - not available via public API)
 - [ ] Fetch ticker data (deferred)
-- [x] Store to Parquet with versioning (logic implemented)
+- [x] Store to Parquet with versioning (logic implemented, exchange-aware)
 - [x] Data completeness validation (logic implemented)
 ```
 > **Note:** Actual data fetching is tracked in Task 7.4. Script exists but has not successfully run yet.
+> Multi-exchange: `create_historical_client()` factory selects OKXHistoricalClient, BinanceHistoricalClient, or BybitHistoricalClient based on `--exchange` flag.
 
 ### Task 7.2: Training Orchestrator ✅
 ```
