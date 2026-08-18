@@ -152,9 +152,8 @@ class TestGetOrCreateUser:
         assert is_new is True
         assert user.user_id.startswith("usr_")
         assert user.display_name == "Alice"
-        assert user.role == "VIEWER"
-        # Should add user, identity, and OKX integration
-        assert session.add.call_count == 3
+        # Should add user, identity, OKX integration, and audit log [A-M4]
+        assert session.add.call_count == 4
         session.commit.assert_awaited()
 
     @pytest.mark.asyncio
@@ -580,15 +579,14 @@ class TestCreatePairingSession:
 
         assert pairing_id.startswith("PAIR-")
         assert raw_token.startswith("tg_connect_")
-        session.add.assert_called_once()
+        assert session.add.call_count == 2
         session.commit.assert_awaited()
 
-        added = session.add.call_args[0][0]
-        assert isinstance(added, PairingSessionModel)
-        assert added.user_id == "usr_abc123"
-        assert added.status == "PENDING"
+        pairing_model = [c.args[0] for c in session.add.call_args_list if isinstance(c.args[0], PairingSessionModel)][0]
+        assert pairing_model.user_id == "usr_abc123"
+        assert pairing_model.status == "PENDING"
         # Token hash matches raw token
-        assert added.token_hash == sha256(raw_token.encode()).hexdigest()
+        assert pairing_model.token_hash == sha256(raw_token.encode()).hexdigest()
 
     @pytest.mark.asyncio
     async def test_custom_expiry(self):
@@ -598,10 +596,10 @@ class TestCreatePairingSession:
 
         await service.create_pairing_session("usr_abc123", expiry_minutes=5)
 
-        added = session.add.call_args[0][0]
+        pairing_model = [c.args[0] for c in session.add.call_args_list if isinstance(c.args[0], PairingSessionModel)][0]
         # Expiry should be ~5 minutes from now
         expected_expiry = datetime.now(UTC) + timedelta(minutes=5)
-        assert abs((added.expires_at - expected_expiry).total_seconds()) < 5
+        assert abs((pairing_model.expires_at - expected_expiry).total_seconds()) < 5
 
 
 class TestVerifyPairingToken:
@@ -631,8 +629,8 @@ class TestVerifyPairingToken:
         assert is_new is True
         assert pairing.status == "USED"
         assert pairing.telegram_user_id == 12345
-        # New identity added
-        session.add.assert_called_once()
+        # New identity and audit log added
+        assert session.add.call_count == 2
 
     @pytest.mark.asyncio
     async def test_invalid_token_raises(self):

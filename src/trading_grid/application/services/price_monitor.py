@@ -537,6 +537,7 @@ class PriceMonitorService:
             reference_price=reference_price,
             user_id=grid.user_id,
             idempotency_key=idempotency_key,
+            skip_rate_limit=True,  # [A-M1] Autonomous grid triggers bypass interactive rate limit
         )
 
         if result.success:

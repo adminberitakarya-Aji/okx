@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from trading_grid.infrastructure.database.engine import get_session_factory
 from trading_grid.infrastructure.database.models import (
+    AuditLogModel,
     ExchangeIntegrationModel,
     PairingSessionModel,
     TelegramIdentityModel,
@@ -123,6 +124,19 @@ class UserService:
                 environment="DEMO",
             )
             session.add(okx)
+
+            # [A-M4] Security rule: All user operations are audit logged
+            session.add(
+                AuditLogModel(
+                    timestamp=now,
+                    actor=f"tg:{telegram_user_id}",
+                    action="USER_CREATED",
+                    resource_type="USER",
+                    resource_id=user_id,
+                    user_id=user_id,
+                    success=True,
+                )
+            )
 
             await session.commit()
 
@@ -381,6 +395,17 @@ class UserService:
                 return False
 
             identity.status = "REVOKED"
+            session.add(
+                AuditLogModel(
+                    timestamp=datetime.now(UTC),
+                    actor=f"tg:{telegram_user_id}",
+                    action="TELEGRAM_UNLINKED",
+                    resource_type="TELEGRAM_IDENTITY",
+                    resource_id=identity.user_id,
+                    user_id=identity.user_id,
+                    success=True,
+                )
+            )
             await session.commit()
 
             logger.info(
@@ -416,6 +441,17 @@ class UserService:
                     token_hash=token_hash,
                     status="PENDING",
                     expires_at=expires_at,
+                )
+            )
+            session.add(
+                AuditLogModel(
+                    timestamp=datetime.now(UTC),
+                    actor=user_id,
+                    action="PAIRING_SESSION_CREATED",
+                    resource_type="PAIRING_SESSION",
+                    resource_id=pairing_id,
+                    user_id=user_id,
+                    success=True,
                 )
             )
             await session.commit()
@@ -510,6 +546,17 @@ class UserService:
                 last_active_at=now,
             )
             session.add(identity)
+            session.add(
+                AuditLogModel(
+                    timestamp=now,
+                    actor=f"tg:{telegram_user_id}",
+                    action="PAIRING_VERIFIED",
+                    resource_type="PAIRING_SESSION",
+                    resource_id=pairing.pairing_id,
+                    user_id=user.user_id,
+                    success=True,
+                )
+            )
             await session.commit()
 
             logger.info(

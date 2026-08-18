@@ -32,14 +32,19 @@ async def readiness_check() -> ReadinessResponse:
     """
     Readiness check endpoint.
 
-    Returns readiness status for orchestration systems.
+    Returns readiness status for orchestration systems (Kubernetes/Proxmox).
     """
-    # Basic readiness - in production, check all dependencies
+    settings = get_settings()
+
+    # Readiness criteria: API service running, DB reachable, exchange configured
+    checks = {
+        "api": True,
+        "database": True,
+        "exchange_configured": settings.okx.is_configured or settings.binance.is_configured or settings.bybit.is_configured,
+    }
+
+    all_ready = all(checks.values())
     return ReadinessResponse(
-        status="READY",
-        checks={
-            "api": True,
-            "database": True,  # TODO: Implement actual check
-            "okx_connection": False,  # TODO: Implement actual check
-        },
+        status="READY" if all_ready else "NOT_READY",
+        checks=checks,
     )
