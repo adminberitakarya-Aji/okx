@@ -9,6 +9,7 @@ Security rule #12: Reconciliation required after any disconnect.
 """
 
 from abc import ABC
+from decimal import Decimal
 from typing import ClassVar
 
 import pytest
@@ -176,3 +177,33 @@ class TestAdapterModes:
         settings = BybitSettings(api_key="k", api_secret="s", testnet_mode=False, _env_file=None)
         adapter = BybitAdapter(settings)
         assert adapter.mode == "LIVE"
+
+
+class TestGetTickerModel:
+    """[D-M8] Test get_ticker_model domain conversion."""
+
+    @pytest.mark.asyncio
+    async def test_get_ticker_model_converts_dict_to_ticker_instance(self) -> None:
+        """ExchangeAdapter.get_ticker_model must parse dict into domain Ticker."""
+        from unittest.mock import AsyncMock
+        from trading_grid.config.settings import OKXSettings
+        from trading_grid.domain.market.models import Ticker
+
+        settings = OKXSettings(api_key="k", api_secret="s", passphrase="p", _env_file=None)
+        adapter = OKXAdapter(settings)
+        adapter.get_ticker = AsyncMock(return_value={
+            "instId": "BTC-USDT",
+            "last": "65000.5",
+            "bid": "65000.0",
+            "ask": "65001.0",
+            "vol24h": "1234.5",
+        })
+
+        ticker = await adapter.get_ticker_model("BTC-USDT")
+        assert isinstance(ticker, Ticker)
+        assert ticker.market_id == "BTC-USDT"
+        assert ticker.last_price == Decimal("65000.5")
+        assert ticker.bid_price == Decimal("65000.0")
+        assert ticker.ask_price == Decimal("65001.0")
+        assert ticker.volume_24h == Decimal("1234.5")
+

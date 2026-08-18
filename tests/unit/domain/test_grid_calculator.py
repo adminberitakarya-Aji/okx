@@ -333,3 +333,60 @@ class TestPopulateSectionLevels:
         assert populated.levels[0].price == Decimal("100")
         assert populated.levels[0].quantity == Decimal("1")  # 100 / 100
         assert populated.levels[4].price == Decimal("96")
+
+
+class TestDomainCalculatorBoundaries:
+    """[D-H2, D-M3] Tests for lower_price boundary checks and section validation."""
+
+    def test_geometric_series_breaching_lower_price_raises_validation_error(self) -> None:
+        """[D-H2] If geometric prices decay below section.lower_price, raise BlueprintValidationError."""
+        from trading_grid.domain.grid.calculator import calculate_section_prices
+
+        # upper=100, spacing=2%, 5 grids: prices will be ~100, 98, 96.04, 94.12, 92.24
+        # lower_price=95 -> prices[-1] (92.24) breaches lower_price (95)
+        section = Section(
+            section_id=1,
+            upper_price=Decimal("100"),
+            lower_price=Decimal("95"),
+            grid_count=5,
+            grid_spacing_pct=Decimal("2"),
+            capital_allocation_pct=Decimal("100"),
+        )
+        with pytest.raises(BlueprintValidationError, match="breaches lower price boundary"):
+            calculate_section_prices(section, spacing_mode="geometric")
+
+    def test_blueprint_validation_catches_geometric_lower_price_breach(self) -> None:
+        """[D-H2] validate_blueprint must report geometric series lower price breaches."""
+        section = Section(
+            section_id=1,
+            upper_price=Decimal("100"),
+            lower_price=Decimal("95"),
+            grid_count=5,
+            grid_spacing_pct=Decimal("2"),
+            capital_allocation_pct=Decimal("100"),
+        )
+        blueprint = Blueprint(
+            blueprint_id="bp-test",
+            market_id="BTC-USDT",
+            total_capital=Decimal("1000"),
+            sections=[section],
+        )
+        errors = validate_blueprint(blueprint)
+        assert any("breaches lower price" in e for e in errors)
+
+    def test_arithmetic_invalid_price_range_raises(self) -> None:
+        """[D-M3] Arithmetic mode requires upper_price > lower_price."""
+        from trading_grid.domain.grid.calculator import calculate_section_prices
+
+        section = Section(
+            section_id=1,
+            upper_price=Decimal("100"),
+            lower_price=Decimal("90"),
+            grid_count=5,
+            grid_spacing_pct=Decimal("2"),
+            capital_allocation_pct=Decimal("100"),
+        )
+        prices = calculate_section_prices(section, spacing_mode="arithmetic")
+        assert len(prices) == 5
+        assert prices[0] == Decimal("100")
+        assert prices[-1] == Decimal("90")

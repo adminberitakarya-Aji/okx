@@ -121,9 +121,21 @@ def calculate_section_prices(
             prices.append(rounded_price)
             current_price = current_price * spacing_ratio
 
+        # [D-H2] Boundary check: geometric price series lowest level must not breach lower_price
+        if prices and prices[-1] < section.lower_price:
+            raise BlueprintValidationError(
+                f"Section {section.section_id}: calculated lowest geometric price ({prices[-1]}) "
+                f"breaches lower price boundary ({section.lower_price})",
+                errors=[f"Section {section.section_id}: lowest price {prices[-1]} < lower_price {section.lower_price}"],
+            )
+
     elif spacing_mode == "arithmetic":
         # Arithmetic: equal absolute difference between prices
         price_range = section.upper_price - section.lower_price
+        if price_range <= Decimal("0"):
+            raise BlueprintValidationError(
+                f"Section {section.section_id}: upper_price ({section.upper_price}) must exceed lower_price ({section.lower_price})"
+            )
         spacing_amount = price_range / Decimal(section.grid_count - 1)
         current_price = section.upper_price
 
@@ -193,6 +205,27 @@ def validate_blueprint(blueprint: Blueprint) -> list[str]:
                 f"Section {section.section_id}: grid count {section.grid_count} "
                 f"exceeds maximum {MAX_GRIDS_PER_SECTION}"
             )
+
+        # Check section boundaries [D-M3]
+        if section.upper_price <= section.lower_price:
+            errors.append(
+                f"Section {section.section_id}: upper price ({section.upper_price}) "
+                f"must be greater than lower price ({section.lower_price})"
+            )
+        if section.lower_price <= Decimal("0"):
+            errors.append(
+                f"Section {section.section_id}: lower price ({section.lower_price}) must be positive"
+            )
+
+        # Check geometric decay lower price boundary [D-H2]
+        if section.grid_count > 1:
+            decay_factor = (Decimal("1") - (section.grid_spacing_pct / Decimal("100"))) ** (section.grid_count - 1)
+            lowest_geometric = section.upper_price * decay_factor
+            if lowest_geometric < section.lower_price:
+                errors.append(
+                    f"Section {section.section_id}: geometric series lowest price "
+                    f"({lowest_geometric:.4f}) breaches lower price ({section.lower_price})"
+                )
 
     # Check section ordering (each section should be below previous)
     for i in range(1, len(blueprint.sections)):

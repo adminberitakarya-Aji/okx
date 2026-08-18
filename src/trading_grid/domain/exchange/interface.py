@@ -23,7 +23,7 @@ from decimal import Decimal
 from typing import Any
 
 from trading_grid.domain.execution.models import Fill, Order, Position
-from trading_grid.domain.market.models import Candle, Market, OrderBook
+from trading_grid.domain.market.models import Candle, Market, OrderBook, Ticker
 from trading_grid.domain.shared.types import ExchangeId, ExecutionMode, MarketId
 
 
@@ -100,8 +100,37 @@ class ExchangeAdapter(ABC):
         """Get available spot instruments."""
 
     @abstractmethod
-    async def get_ticker(self, market_id: MarketId) -> dict[str, Any]:
-        """Get ticker for market."""
+    async def get_ticker(self, market_id: MarketId) -> dict[str, Any] | Ticker:
+        """
+        Get ticker for market.
+
+        Returns raw dictionary payload or normalized domain Ticker model.
+        """
+
+    async def get_ticker_model(self, market_id: MarketId) -> Ticker:
+        """
+        Get normalized domain Ticker model for market.
+
+        Converts raw ticker response into a validated domain Ticker instance.
+        """
+        from datetime import UTC, datetime
+        raw = await self.get_ticker(market_id)
+        if isinstance(raw, Ticker):
+            return raw
+
+        last_str = raw.get("last") or raw.get("price") or raw.get("lastPrice") or "0"
+        bid_str = raw.get("bid") or raw.get("bidPrice") or raw.get("buy")
+        ask_str = raw.get("ask") or raw.get("askPrice") or raw.get("sell")
+        vol_str = raw.get("vol24h") or raw.get("volume") or raw.get("volume24h") or "0"
+
+        return Ticker(
+            market_id=market_id,
+            timestamp=datetime.now(UTC),
+            last_price=Decimal(str(last_str)),
+            bid_price=Decimal(str(bid_str)) if bid_str is not None else None,
+            ask_price=Decimal(str(ask_str)) if ask_str is not None else None,
+            volume_24h=Decimal(str(vol_str)),
+        )
 
     @abstractmethod
     async def get_orderbook(self, market_id: MarketId, depth: int = 20) -> OrderBook:

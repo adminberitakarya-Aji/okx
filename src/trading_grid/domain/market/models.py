@@ -307,8 +307,17 @@ class MarketState:
     atr: Decimal | None = None
     liquidity_score: Decimal | None = None
     momentum_score: Decimal | None = None
-    regime: MarketRegime | str | None = None
+    regime: MarketRegime | None = None
     data_quality: dict[str, bool] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Validate market state regime."""
+        if self.regime is not None:
+            valid_regimes = ("RANGING", "TRENDING_UP", "TRENDING_DOWN", "VOLATILE", "BREAKOUT", "UNKNOWN")
+            if self.regime not in valid_regimes:
+                raise ValueError(
+                    f"Invalid market regime: '{self.regime}'. Must be one of {valid_regimes}"
+                )
 
     @property
     def current_price(self) -> Price | None:

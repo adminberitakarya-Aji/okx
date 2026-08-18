@@ -461,3 +461,13 @@ class TestMarketState:
         """Data incomplete when no flags."""
         state = MarketState(market_id="BTC-USDT")
         assert not state.is_data_complete
+
+    def test_valid_market_regime(self):
+        """[D-M7] Valid market regime should be accepted."""
+        state = MarketState(market_id="BTC-USDT", regime="RANGING")
+        assert state.regime == "RANGING"
+
+    def test_invalid_market_regime_raises(self):
+        """[D-M7] Invalid market regime should raise ValueError."""
+        with pytest.raises(ValueError, match="Invalid market regime"):
+            MarketState(market_id="BTC-USDT", regime="INVALID_REGIME_VALUE")
