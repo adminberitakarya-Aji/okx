@@ -28,6 +28,7 @@ import structlog
 from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy import select
 
+from trading_grid.application.services.authorization import Identity, Role
 from trading_grid.infrastructure.database.engine import get_session_factory
 from trading_grid.infrastructure.database.models import (
     AuditLogModel,
@@ -196,6 +197,7 @@ class CredentialService:
         api_secret: str,
         passphrase: str | None = None,
         actor: str = "system",
+        identity: Identity | None = None,
     ) -> str:
         """
         Store (or replace) an encrypted credential for a user.
@@ -208,13 +210,21 @@ class CredentialService:
             api_secret: Plaintext API secret (encrypted before storage)
             passphrase: Plaintext passphrase (OKX only, encrypted before storage)
             actor: Who performed this action (for audit)
+            identity: Optional authenticated identity for RBAC tenant isolation
 
         Returns:
             credential_id of the stored credential
 
         Raises:
+            PermissionError: If caller identity is not authorized
             ValueError: If exchange or environment is invalid
         """
+        # [A-H8] RBAC: verify identity ownership
+        if identity is not None and identity.identity_id != user_id and identity.role < Role.SYSTEM_ADMIN:
+            raise PermissionError(
+                f"User '{identity.identity_id}' is not authorized to manage credentials for '{user_id}'"
+            )
+
         exchange_upper = exchange.upper()
         environment_upper = environment.upper()
 
@@ -307,6 +317,7 @@ class CredentialService:
         exchange: str,
         environment: str,
         actor: str = "system",
+        identity: Identity | None = None,
     ) -> DecryptedCredential:
         """
         Retrieve and decrypt a credential for a user.
@@ -316,14 +327,22 @@ class CredentialService:
             exchange: Exchange ID ("OKX", "BINANCE", "BYBIT")
             environment: "DEMO" or "LIVE"
             actor: Who is accessing this credential (for audit)
+            identity: Optional authenticated identity for RBAC tenant isolation
 
         Returns:
             DecryptedCredential (in-memory only, never persist)
 
         Raises:
+            PermissionError: If caller identity is not authorized
             CredentialNotFoundError: If no active credential exists
             CredentialEncryptionError: If decryption fails
         """
+        # [A-H8] RBAC: verify identity ownership
+        if identity is not None and identity.identity_id != user_id and identity.role < Role.SYSTEM_ADMIN:
+            raise PermissionError(
+                f"User '{identity.identity_id}' is not authorized to access credentials for '{user_id}'"
+            )
+
         exchange_upper = exchange.upper()
         environment_upper = environment.upper()
 
@@ -406,6 +425,7 @@ class CredentialService:
         exchange: str,
         environment: str,
         actor: str = "system",
+        identity: Identity | None = None,
     ) -> bool:
         """
         Revoke (soft-delete) a credential.
@@ -418,10 +438,20 @@ class CredentialService:
             exchange: Exchange ID
             environment: "DEMO" or "LIVE"
             actor: Who performed this action (for audit)
+            identity: Optional authenticated identity for RBAC tenant isolation
 
         Returns:
             True if a credential was revoked, False if not found
+
+        Raises:
+            PermissionError: If caller identity is not authorized
         """
+        # [A-H8] RBAC: verify identity ownership
+        if identity is not None and identity.identity_id != user_id and identity.role < Role.SYSTEM_ADMIN:
+            raise PermissionError(
+                f"User '{identity.identity_id}' is not authorized to revoke credentials for '{user_id}'"
+            )
+
         exchange_upper = exchange.upper()
         environment_upper = environment.upper()
 

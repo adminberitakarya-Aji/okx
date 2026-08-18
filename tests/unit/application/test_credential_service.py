@@ -522,3 +522,58 @@ class TestHasCredential:
 
         result = await self.service.has_credential("usr_123", "OKX", "DEMO")
         assert result is False
+
+
+class TestCredentialRBAC:
+    """[A-H8] Tests for CredentialService RBAC tenant isolation."""
+
+    def setup_method(self) -> None:
+        self.key = generate_fernet_key()
+        settings = make_settings(encryption_key=self.key)
+        self.mock_session_factory = MagicMock()
+        self.service = CredentialService(settings, session_factory=self.mock_session_factory)
+
+    @pytest.mark.asyncio
+    async def test_unauthorized_user_cannot_access_other_user_credential(self) -> None:
+        """User A cannot read User B's credentials unless admin."""
+        from trading_grid.application.services.authorization import Identity, Role
+
+        identity_a = Identity(identity_id="usr_A", identity_type="HUMAN", role=Role.VIEWER)
+
+        with pytest.raises(PermissionError, match="not authorized"):
+            await self.service.get_credential(
+                user_id="usr_B",
+                exchange="OKX",
+                environment="DEMO",
+                identity=identity_a,
+            )
+
+    @pytest.mark.asyncio
+    async def test_admin_can_access_other_user_credential(self) -> None:
+        """SYSTEM_ADMIN can access user's credentials."""
+        from trading_grid.application.services.authorization import Identity, Role
+        from trading_grid.infrastructure.database.models import UserCredentialModel
+
+        mock_session = AsyncMock()
+        mock_cred = MagicMock(spec=UserCredentialModel)
+        mock_cred.encrypted_api_key = self.service._encrypt("key")
+        mock_cred.encrypted_api_secret = self.service._encrypt("sec")
+        mock_cred.encrypted_passphrase = None
+        mock_cred.credential_id = "cred_1"
+        mock_cred.key_fingerprint = "fp1"
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_cred
+        mock_session.execute.return_value = mock_result
+        mock_session.add = MagicMock()
+        self.mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+        self.mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        admin = Identity(identity_id="admin_1", identity_type="HUMAN", role=Role.SYSTEM_ADMIN)
+        cred = await self.service.get_credential(
+            user_id="usr_B",
+            exchange="OKX",
+            environment="DEMO",
+            identity=admin,
+        )
+        assert cred.api_key == "key"
+
