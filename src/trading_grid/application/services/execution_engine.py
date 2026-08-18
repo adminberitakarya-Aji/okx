@@ -189,6 +189,10 @@ class ExecutionEngine:
 
         order_id = f"ORD-{uuid4().hex[:12].upper()}"
 
+        meta = dict(metadata or {})
+        if user_id is not None and "user_id" not in meta:
+            meta["user_id"] = user_id
+
         order = Order(
             order_id=order_id,
             market_id=market_id,
@@ -196,7 +200,7 @@ class ExecutionEngine:
             order_type="MARKET" if price is None else "LIMIT",
             quantity=quantity,
             price=price,
-            metadata=metadata or {},
+            metadata=meta,
             idempotency_key=idempotency_key,
         )
 
