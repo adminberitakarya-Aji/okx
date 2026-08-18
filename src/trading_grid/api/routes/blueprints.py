@@ -108,11 +108,10 @@ async def generate_blueprint(
     adapter = service._adapter
     if adapter is not None:
         try:
+            # [D-M8] get_ticker now returns a domain Ticker model
             ticker = await adapter.get_ticker(market_id_upper)
-            if ticker:
-                last = ticker.get("last") or ticker.get("close")
-                if last is not None:
-                    current_price = Decimal(str(last))
+            if ticker.last_price > Decimal("0"):
+                current_price = ticker.last_price
         except Exception:
             logger.debug("blueprint_price_fetch_failed", market_id=market_id_upper)
 

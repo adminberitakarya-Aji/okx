@@ -186,6 +186,7 @@ class ParquetStorage:
             start_time=candles[0].timestamp if candles else None,
             end_time=candles[-1].timestamp if candles else None,
             gaps=gaps or [],
+            extra={"parquet_schema_version": self.PARQUET_SCHEMA_VERSION},
         )
         self._save_metadata(metadata, market_id, interval)
 
@@ -324,17 +325,27 @@ class ParquetStorage:
 
         return summary
 
+    # Schema version for Parquet files.
+    # v1: float64 columns (legacy, precision loss)
+    # v2: string columns for Decimal fields (lossless round-trip)
+    PARQUET_SCHEMA_VERSION = 2
+
     def _candles_to_dataframe(self, candles: list[Candle]) -> pd.DataFrame:
-        """Convert Candle objects to DataFrame."""
+        """Convert Candle objects to DataFrame.
+
+        [R-H3] Decimal fields are stored as strings to preserve precision.
+        Float64 representation loses Decimal precision (e.g., 0.1 + 0.2 != 0.3).
+        String round-trip is lossless: str(Decimal) -> Decimal(str).
+        """
         records = [
             {
                 "timestamp": c.timestamp,
-                "open": float(c.open),
-                "high": float(c.high),
-                "low": float(c.low),
-                "close": float(c.close),
-                "volume": float(c.volume),
-                "quote_volume": float(c.quote_volume),
+                "open": str(c.open),
+                "high": str(c.high),
+                "low": str(c.low),
+                "close": str(c.close),
+                "volume": str(c.volume),
+                "quote_volume": str(c.quote_volume),
                 "trade_count": c.trade_count,
             }
             for c in candles

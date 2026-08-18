@@ -28,11 +28,10 @@ async def _current_price_for(market_id: str) -> Decimal | None:
     if adapter is None:
         return None
     try:
+        # [D-M8] get_ticker now returns a domain Ticker model
         ticker = await adapter.get_ticker(market_id)
-        if ticker:
-            last = ticker.get("last") or ticker.get("close")
-            if last is not None:
-                return Decimal(str(last))
+        if ticker.last_price > Decimal("0"):
+            return ticker.last_price
     except Exception:
         logger.debug("position_price_fetch_failed", market_id=market_id)
     return None

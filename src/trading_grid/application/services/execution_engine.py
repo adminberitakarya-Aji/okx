@@ -28,6 +28,7 @@ from uuid import uuid4
 
 import structlog
 
+from trading_grid.application.services.authorization import Identity, PermissionLevel
 from trading_grid.application.services.risk_validation import RiskValidationService
 from trading_grid.application.services.tenant_limits import (
     MaxGridsExceededError,
@@ -122,6 +123,8 @@ class ExecutionEngine:
         user_id: str | None = None,
         active_grid_count: int = 0,
         idempotency_key: str | None = None,
+        identity: Identity | None = None,
+        skip_rate_limit: bool = False,
     ) -> ExecutionResult:
         """
         Execute an order with immediate execution.
@@ -135,6 +138,13 @@ class ExecutionEngine:
         rate limit, max concurrent grids) BEFORE risk validation. If any
         per-user check fails, the order is rejected locally and never reaches
         the exchange.
+
+        [A-H7] Authorization: When an identity is provided, the engine verifies:
+        1. The identity can access the current environment (DEMO/LIVE)
+        2. The identity has sufficient permission level:
+           - DEMO mode: DEMO_OPERATOR (Level 2)
+           - LIVE mode: LIVE_OPERATOR (Level 3)
+        If authorization fails, the order is rejected locally.
 
         Idempotency: When an idempotency_key is provided, the engine checks
         whether an order with the same key already exists. If it does and is
@@ -157,10 +167,36 @@ class ExecutionEngine:
             idempotency_key: Deterministic key for deduplication. If an
                 order with this key already exists in an active/filled
                 state, the existing result is returned (no duplicate submit).
+            identity: [A-H7] Authenticated identity for RBAC authorization.
+                When provided, environment access and permission level are
+                verified before order execution.
+            skip_rate_limit: [A-M1] Skip the per-user interactive rate limit
+                check. Used by autonomous grid triggers (PriceMonitorService)
+                so that machine-generated orders are not throttled by the
+                interactive rate limit. Emergency stop and max-grid checks
+                are still enforced.
 
         Returns:
             ExecutionResult with order details
         """
+        # [A-H7] AUTHORIZATION CHECK — verify identity can execute in this environment
+        if identity is not None:
+            auth_result = self._check_execution_authorization(identity)
+            if not auth_result.is_authorized:
+                logger.warning(
+                    "execute_order_unauthorized",
+                    identity_id=identity.identity_id,
+                    role=identity.role.name,
+                    environment=self.mode,
+                    reason=auth_result.reason,
+                    market_id=market_id,
+                    side=side,
+                )
+                return ExecutionResult(
+                    success=False,
+                    order_id="UNAUTHORIZED",
+                    error_message=f"Authorization denied: {auth_result.reason}",
+                )
         # IDEMPOTENCY CHECK — return existing result if this key was already
         # processed. This is the primary defense against double-execution
         # caused by network timeouts + retries. The DB unique constraint on
@@ -227,6 +263,7 @@ class ExecutionEngine:
                 self._tenant_limits.check_can_trade(
                     user_id=user_id,
                     active_grid_count=active_grid_count,
+                    skip_rate_limit=skip_rate_limit,  # [A-M1] autonomous triggers bypass rate limit
                 )
             except UserEmergencyStoppedError as e:
                 order.status = "REJECTED"
@@ -540,3 +577,58 @@ class ExecutionEngine:
         avg_price = data.get("average_price")
         if avg_price:
             order.average_fill_price = Decimal(avg_price)
+
+    def _check_execution_authorization(self, identity: Identity) -> "AuthorizationResult":
+        """
+        [A-H7] Check if identity is authorized to execute orders.
+
+        Authorization rules:
+        1. Identity must be allowed to access the current environment (DEMO/LIVE)
+        2. Identity must have sufficient permission level:
+           - DEMO mode: DEMO_OPERATOR (Level 2)
+           - LIVE mode: LIVE_OPERATOR (Level 3)
+
+        Args:
+            identity: The authenticated identity to check
+
+        Returns:
+            AuthorizationResult with is_authorized and reason
+        """
+        from trading_grid.application.services.authorization import AuthorizationResult
+
+        # Check environment access
+        if not identity.can_access_environment(self.mode):
+            return AuthorizationResult(
+                is_authorized=False,
+                identity=identity,
+                operation="LIVE_EXECUTE" if self.mode == "LIVE" else "GRID_START",
+                environment=self.mode,
+                reason=f"Identity not allowed in {self.mode} environment",
+            )
+
+        # Check permission level based on environment
+        if self.mode == "LIVE":
+            required_level = PermissionLevel.LIVE_OPERATOR
+            operation = "LIVE_EXECUTE"
+        else:
+            required_level = PermissionLevel.DEMO_OPERATOR
+            operation = "GRID_START"
+
+        if identity.permission_level < required_level:
+            return AuthorizationResult(
+                is_authorized=False,
+                identity=identity,
+                operation=operation,
+                environment=self.mode,
+                reason=(
+                    f"Insufficient permission level: {identity.permission_level.name} "
+                    f"(requires {required_level.name})"
+                ),
+            )
+
+        return AuthorizationResult(
+            is_authorized=True,
+            identity=identity,
+            operation=operation,
+            environment=self.mode,
+        )

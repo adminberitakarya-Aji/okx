@@ -32,7 +32,7 @@ import structlog
 from trading_grid.config.settings import BinanceSettings
 from trading_grid.domain.exchange.interface import ExchangeAdapter
 from trading_grid.domain.execution.models import Fill, Order, Position
-from trading_grid.domain.market.models import Candle, Market, OrderBook, OrderBookLevel
+from trading_grid.domain.market.models import Candle, Market, OrderBook, OrderBookLevel, Ticker
 from trading_grid.domain.shared.types import ExchangeId, ExecutionMode, MarketId
 from trading_grid.infrastructure.binance.rest_client import BinanceAPIError, BinanceRestClient
 from trading_grid.infrastructure.binance.websocket_client import BinanceWebSocketClient
@@ -69,14 +69,20 @@ class BinanceAdapter(ExchangeAdapter):
     - Reconciliation after disconnects
     """
 
-    def __init__(self, settings: BinanceSettings) -> None:
+    def __init__(self, settings: BinanceSettings, default_quote_currency: str = "USDT") -> None:
         """
         Initialize Binance adapter.
 
         Args:
             settings: Binance API settings
+            default_quote_currency: [I-M6] Default quote currency for balance-derived
+                positions. Binance spot has no positions endpoint, so positions are
+                derived from balances. The actual trading pair quote currency is not
+                available from balances alone; this parameter provides a configurable
+                default instead of hardcoding "USDT".
         """
         self._settings = settings
+        self._default_quote_currency = default_quote_currency
         self._rest = BinanceRestClient(settings)
         self._public_ws: BinanceWebSocketClient | None = None
         self._private_ws: BinanceWebSocketClient | None = None
@@ -85,6 +91,8 @@ class BinanceAdapter(ExchangeAdapter):
         self._needs_reconciliation = False
         self._order_update_handlers: list[Callable[[dict[str, Any]], None]] = []
         self._ticker_handlers: list[Callable[[dict[str, Any]], None]] = []
+        # Cache of base_asset -> quote_currency from exchange info (populated lazily)
+        self._quote_currency_map: dict[str, str] = {}
 
     @property
     def exchange_id(self) -> ExchangeId:
@@ -252,10 +260,20 @@ class BinanceAdapter(ExchangeAdapter):
 
         return markets
 
-    async def get_ticker(self, market_id: MarketId) -> dict[str, Any]:
-        """Get ticker for market."""
+    async def get_ticker(self, market_id: MarketId) -> Ticker:
+        """Get ticker for market. [D-M8] Returns normalized domain Ticker model."""
         symbol = to_concatenated_symbol(market_id)
-        return await self._rest.get_ticker(symbol)
+        raw = await self._rest.get_ticker(symbol)
+        return Ticker(
+            market_id=market_id,
+            timestamp=datetime.now(UTC),
+            last_price=Decimal(str(raw.get("lastPrice") or "0")),
+            bid_price=Decimal(str(raw["bidPrice"])) if raw.get("bidPrice") else None,
+            ask_price=Decimal(str(raw["askPrice"])) if raw.get("askPrice") else None,
+            volume_24h=Decimal(str(raw.get("volume") or "0")),
+            quote_volume_24h=Decimal(str(raw.get("quoteVolume") or "0")),
+            high_24h=Decimal(str(raw["highPrice"])) if raw.get("highPrice") else None,
+        )
 
     async def get_orderbook(self, market_id: MarketId, depth: int = 20) -> OrderBook:
         """Get order book for market."""
@@ -332,6 +350,26 @@ class BinanceAdapter(ExchangeAdapter):
 
         return balances
 
+    async def _ensure_quote_currency_map(self) -> None:
+        """
+        [I-M6] Lazily populate the base_asset -> quote_currency map from exchange info.
+
+        This allows get_positions() to use the actual quote currency for each
+        asset instead of hardcoding "USDT".
+        """
+        if self._quote_currency_map:
+            return
+        try:
+            data = await self._rest.get_exchange_info()
+            for item in data.get("symbols", []):
+                if item.get("status") == "TRADING":
+                    base = item.get("baseAsset", "")
+                    quote = item.get("quoteAsset", "")
+                    if base and quote and base not in self._quote_currency_map:
+                        self._quote_currency_map[base] = quote
+        except Exception as e:
+            logger.warning("binance_quote_map_populate_failed", error=str(e))
+
     async def get_positions(self) -> list[Position]:
         """
         Get current spot positions.
@@ -339,7 +377,12 @@ class BinanceAdapter(ExchangeAdapter):
         Binance spot has no positions endpoint — positions are derived from
         account balances. Average entry price is NOT available from balances
         and defaults to 0 (documented limitation).
+
+        [I-M6] The quote currency for each position is resolved dynamically
+        from exchange info instead of hardcoding "USDT". Falls back to
+        the configured default_quote_currency if the asset is not found.
         """
+        await self._ensure_quote_currency_map()
         data = await self._rest.get_account()
         positions = []
 
@@ -354,10 +397,11 @@ class BinanceAdapter(ExchangeAdapter):
                 qty = free + locked
 
                 if qty > 0 and asset not in quote_assets:
-                    # Position ID uses normalized market id convention
+                    # [I-M6] Resolve quote currency dynamically
+                    quote_ccy = self._quote_currency_map.get(asset, self._default_quote_currency)
                     position = Position(
                         position_id=f"{asset}-spot",
-                        market_id=f"{asset}-USDT",
+                        market_id=f"{asset}-{quote_ccy}",
                         quantity=qty,
                         average_entry_price=Decimal("0"),
                     )

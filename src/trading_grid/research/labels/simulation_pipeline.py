@@ -123,6 +123,11 @@ class SimulationLabelPipelineConfig:
     # Label version
     label_version: str = LABEL_VERSION
 
+    # [R-M6] Explicit universe snapshot ID for full determinism.
+    # If None, derived deterministically from the data range (market IDs + timestamps).
+    # Set this explicitly when reproducing historical runs to ensure identical IDs.
+    universe_snapshot_id: str | None = None
+
 
 @dataclass
 class ObservationResult:
@@ -343,15 +348,33 @@ class SimulationLabelPipeline:
         self.storage = storage
         self.config = config or SimulationLabelPipelineConfig()
         self.blueprint_generator = ResearchBlueprintGenerator(self.config.blueprint_config)
-        # [R-M6] Snapshot ID is computed once at pipeline construction time to
-        # ensure all labels generated in a single pipeline run share the same
-        # snapshot identifier, even if the pipeline spans a month boundary.
-        _snapshot_ts = datetime.now(UTC)
-        _snapshot_id = f"universe-{_snapshot_ts.strftime('%Y%m')}"
-        self.label_generator = LabelGenerator(
-            universe_snapshot_id=_snapshot_id,
-            label_version=self.config.label_version,
-        )
+        # [R-M6] LabelGenerator is created lazily in run() so the snapshot ID
+        # can be derived deterministically from the actual data range.
+        self.label_generator: LabelGenerator | None = None
+
+    def _compute_snapshot_id(self, market_ids: list[str], interval: str) -> str:
+        """
+        [R-M6] Compute a deterministic universe snapshot ID.
+
+        If explicitly set in config, use that. Otherwise derive from
+        the sorted market IDs, interval, horizon, and pipeline version.
+        This ensures the same inputs always produce the same snapshot ID,
+        regardless of when the pipeline is run.
+        """
+        if self.config.universe_snapshot_id is not None:
+            return self.config.universe_snapshot_id
+
+        import hashlib
+
+        payload = "|".join([
+            SIMULATION_PIPELINE_VERSION,
+            ",".join(sorted(market_ids)),
+            interval,
+            self.config.horizon,
+            str(self.config.observation_stride),
+        ])
+        digest = hashlib.sha256(payload.encode()).hexdigest()[:12]
+        return f"universe-{digest}"
 
     def run(
         self,
@@ -370,12 +393,20 @@ class SimulationLabelPipeline:
         """
         results = PipelineResults()
 
+        # [R-M6] Initialize label generator with deterministic snapshot ID
+        snapshot_id = self._compute_snapshot_id(market_ids, interval)
+        self.label_generator = LabelGenerator(
+            universe_snapshot_id=snapshot_id,
+            label_version=self.config.label_version,
+        )
+
         logger.info(
             "simulation_label_pipeline_started",
             markets=market_ids,
             horizon=self.config.horizon,
             stride=self.config.observation_stride,
             pipeline_version=SIMULATION_PIPELINE_VERSION,
+            universe_snapshot_id=snapshot_id,
         )
 
         horizon_candles = self._get_horizon_candles(interval)

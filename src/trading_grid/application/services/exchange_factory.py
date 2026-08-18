@@ -22,6 +22,7 @@ import structlog
 from trading_grid.domain.exchange.errors import ExchangeNotConfiguredError
 
 if TYPE_CHECKING:
+    from trading_grid.application.services.authorization import Identity
     from trading_grid.application.services.credential_service import (
         CredentialService,
         DecryptedCredential,
@@ -154,6 +155,7 @@ class ExchangeAdapterFactory:
         environment: str,
         credential_service: CredentialService,
         settings: Settings,
+        identity: Identity | None = None,
     ) -> ExchangeAdapter:
         """
         Create an exchange adapter using a user's stored credentials (Phase 5).
@@ -175,6 +177,10 @@ class ExchangeAdapterFactory:
             environment: "DEMO" or "LIVE"
             credential_service: Service for retrieving encrypted credentials
             settings: Application settings (for base URLs, timeouts, etc.)
+            identity: [A-H8] Optional authenticated identity for RBAC. If not
+                provided, a SYSTEM identity is used (system-level operations
+                like autonomous grid execution are authorized to access
+                credentials for any user).
 
         Returns:
             Configured ExchangeAdapter instance using user credentials
@@ -184,6 +190,8 @@ class ExchangeAdapterFactory:
             CredentialEncryptionError: If decryption fails
             ValueError: If exchange_id or environment is invalid
         """
+        from trading_grid.application.services.authorization import Identity, Role
+
         exchange_id_upper = exchange_id.upper()
 
         if exchange_id_upper not in SUPPORTED_EXCHANGES:
@@ -195,11 +203,21 @@ class ExchangeAdapterFactory:
         if environment not in ("DEMO", "LIVE"):
             raise ValueError(f"Invalid environment: {environment!r}. Use DEMO or LIVE.")
 
+        # [A-H8] Use provided identity or default to SYSTEM identity for
+        # system-level operations (autonomous grid execution, etc.)
+        if identity is None:
+            identity = Identity(
+                identity_id="system",
+                identity_type="SYSTEM",
+                role=Role.SYSTEM_ADMIN,
+            )
+
         # Retrieve and decrypt user credential
         cred: DecryptedCredential = await credential_service.get_credential(
             user_id=user_id,
             exchange=exchange_id_upper,
             environment=environment,
+            identity=identity,
         )
 
         # Build adapter with user credentials

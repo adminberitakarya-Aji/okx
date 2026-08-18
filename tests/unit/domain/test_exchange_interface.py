@@ -180,26 +180,27 @@ class TestAdapterModes:
 
 
 class TestGetTickerModel:
-    """[D-M8] Test get_ticker_model domain conversion."""
+    """[D-M8] Test get_ticker returns a domain Ticker model."""
 
     @pytest.mark.asyncio
-    async def test_get_ticker_model_converts_dict_to_ticker_instance(self) -> None:
-        """ExchangeAdapter.get_ticker_model must parse dict into domain Ticker."""
+    async def test_get_ticker_converts_dict_to_ticker_instance(self) -> None:
+        """ExchangeAdapter.get_ticker must parse raw dict into domain Ticker."""
         from unittest.mock import AsyncMock
         from trading_grid.config.settings import OKXSettings
         from trading_grid.domain.market.models import Ticker
 
         settings = OKXSettings(api_key="k", api_secret="s", passphrase="p", _env_file=None)
         adapter = OKXAdapter(settings)
-        adapter.get_ticker = AsyncMock(return_value={
+        # Mock the underlying REST client to return raw exchange data
+        adapter._rest.get_ticker = AsyncMock(return_value={
             "instId": "BTC-USDT",
             "last": "65000.5",
-            "bid": "65000.0",
-            "ask": "65001.0",
+            "bidPx": "65000.0",
+            "askPx": "65001.0",
             "vol24h": "1234.5",
         })
 
-        ticker = await adapter.get_ticker_model("BTC-USDT")
+        ticker = await adapter.get_ticker("BTC-USDT")
         assert isinstance(ticker, Ticker)
         assert ticker.market_id == "BTC-USDT"
         assert ticker.last_price == Decimal("65000.5")

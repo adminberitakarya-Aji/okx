@@ -24,6 +24,7 @@ from fastapi.responses import JSONResponse
 
 from trading_grid.api.middleware.audit import AuditMiddleware
 from trading_grid.api.middleware.auth import AuthMiddleware
+from trading_grid.api.middleware.rate_limit import RateLimitMiddleware
 from trading_grid.api.routes import (
     account,
     approvals,
@@ -101,6 +102,8 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(AuditMiddleware)
     app.add_middleware(AuthMiddleware)
+    # [I-M5] Per-IP sliding-window rate limiting (120 req/min, in-memory)
+    app.add_middleware(RateLimitMiddleware, max_requests=120, window_seconds=60)
 
     # Register exception handlers
     _register_exception_handlers(app)

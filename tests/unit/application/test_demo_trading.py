@@ -9,6 +9,7 @@ Tests cover:
 - Demo/live mode isolation
 """
 
+from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
@@ -24,6 +25,7 @@ from trading_grid.application.services.demo_trading import (
 from trading_grid.application.services.execution_engine import ExecutionEngine, ExecutionResult
 from trading_grid.application.services.grid_engine import GridEngine
 from trading_grid.domain.grid.models import Blueprint, Section
+from trading_grid.domain.market.models import Ticker
 
 
 def create_test_blueprint(
@@ -59,8 +61,15 @@ def create_mock_execution_engine(mode: str = "DEMO") -> MagicMock:
         )
     )
     # Mock adapter for _get_current_price fallback
+    # [D-M8] get_ticker now returns a domain Ticker model
     mock_adapter = MagicMock()
-    mock_adapter.get_ticker = AsyncMock(return_value={"last": "50000"})
+    mock_adapter.get_ticker = AsyncMock(
+        return_value=Ticker(
+            market_id="BTC-USDT",
+            timestamp=datetime.now(UTC),
+            last_price=Decimal("50000"),
+        )
+    )
     engine._adapter = mock_adapter
     return engine
 
@@ -416,7 +425,12 @@ class TestDemoTradingService:
 
     @pytest.mark.asyncio
     async def test_generate_validation_report_not_ready(self, service: DemoTradingService) -> None:
-        """Test validation report when not ready for live."""
+        """Test validation report when not ready for live.
+
+        [A-M3] After the readiness report fix, "Emergency stop not tested" is
+        no longer a blocking issue — it's tracked as informational metadata.
+        The blocking issue here is insufficient orders.
+        """
         blueprint = create_test_blueprint()
         session = service.create_demo_grid(blueprint)
         await service.start_demo_grid(session.session_id)
@@ -425,7 +439,8 @@ class TestDemoTradingService:
 
         assert report.ready_for_live is False
         assert len(report.issues_found) > 0
-        assert "Emergency stop not tested" in report.issues_found
+        # The actual blocking issue: insufficient orders submitted
+        assert any("Insufficient orders submitted" in issue for issue in report.issues_found)
 
     @pytest.mark.asyncio
     async def test_generate_validation_report_ready(self, service: DemoTradingService) -> None:
@@ -467,8 +482,13 @@ class TestDemoTradingService:
 class TestDemoValidationReport:
     """Tests for DemoValidationReport."""
 
-    def test_evaluate_readiness_fails_without_emergency_stop(self) -> None:
-        """Test readiness fails if emergency stop not tested."""
+    def test_evaluate_readiness_passes_without_emergency_stop(self) -> None:
+        """[A-M3] Emergency stop is no longer a blocking readiness criterion.
+
+        After the A-M3 fix, "Emergency stop not tested" is tracked as
+        informational metadata rather than a blocking issue, so readiness
+        passes when all other criteria are met.
+        """
         from datetime import UTC, datetime
 
         metrics = DemoMetrics()
@@ -485,8 +505,8 @@ class TestDemoValidationReport:
         )
 
         ready = report.evaluate_readiness()
-        assert ready is False
-        assert "Emergency stop not tested" in report.issues_found
+        assert ready is True
+        assert "Emergency stop not tested" not in report.issues_found
 
     def test_evaluate_readiness_fails_with_reconciliation_mismatch(self) -> None:
         """Test readiness fails with reconciliation mismatches."""

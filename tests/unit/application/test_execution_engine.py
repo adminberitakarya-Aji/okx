@@ -386,6 +386,7 @@ class TestExecuteOrderTenantLimits:
         tenant_limits.check_can_trade.assert_called_once_with(
             user_id="usr_1",
             active_grid_count=2,
+            skip_rate_limit=False,
         )
 
     @pytest.mark.asyncio
@@ -555,6 +556,57 @@ class TestExecuteOrderTenantLimits:
 
         tenant_limits.check_can_trade.assert_called_once()
         validator.validate_order.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_skip_rate_limit_forwarded_to_check_can_trade(self):
+        """[A-M1] skip_rate_limit=True is forwarded to check_can_trade.
+
+        Autonomous grid triggers (PriceMonitorService) pass skip_rate_limit=True
+        so machine-generated orders bypass the interactive rate limit while
+        emergency stop and max-grid checks remain enforced.
+        """
+        tenant_limits = _make_tenant_limits()
+        engine = _make_engine(tenant_limits=tenant_limits)
+
+        result = await engine.execute_order(
+            market_id="BTC-USDT",
+            side="BUY",
+            quantity=Decimal("0.01"),
+            price=Decimal("50000"),
+            user_id="usr_1",
+            active_grid_count=1,
+            skip_rate_limit=True,
+        )
+
+        assert result.success is True
+        tenant_limits.check_can_trade.assert_called_once_with(
+            user_id="usr_1",
+            active_grid_count=1,
+            skip_rate_limit=True,
+        )
+
+    @pytest.mark.asyncio
+    async def test_skip_rate_limit_true_still_enforces_emergency_stop(self):
+        """[A-M1] Even with skip_rate_limit=True, emergency stop blocks orders."""
+        adapter = _make_adapter()
+        tenant_limits = _make_tenant_limits()
+        tenant_limits.check_can_trade = MagicMock(
+            side_effect=UserEmergencyStoppedError("User usr_1 is under emergency stop: Stop")
+        )
+        engine = _make_engine(adapter=adapter, tenant_limits=tenant_limits)
+
+        result = await engine.execute_order(
+            market_id="BTC-USDT",
+            side="BUY",
+            quantity=Decimal("0.01"),
+            price=Decimal("50000"),
+            user_id="usr_1",
+            skip_rate_limit=True,
+        )
+
+        assert result.success is False
+        assert "User emergency stopped" in result.error_message
+        adapter.place_order.assert_not_awaited()
 
 
 class TestCancelOrder:

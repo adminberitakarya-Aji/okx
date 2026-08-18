@@ -337,9 +337,13 @@ class TestCreateForUser:
         assert isinstance(adapter, OKXAdapter)
         assert adapter.exchange_id == "OKX"
         assert adapter.mode == "DEMO"
-        cred_service.get_credential.assert_awaited_once_with(
-            user_id="usr_1", exchange="OKX", environment="DEMO"
-        )
+        # [A-H8] get_credential now receives a SYSTEM identity for RBAC
+        cred_service.get_credential.assert_awaited_once()
+        call_kwargs = cred_service.get_credential.call_args.kwargs
+        assert call_kwargs["user_id"] == "usr_1"
+        assert call_kwargs["exchange"] == "OKX"
+        assert call_kwargs["environment"] == "DEMO"
+        assert call_kwargs["identity"].identity_type == "SYSTEM"
 
     @pytest.mark.asyncio
     async def test_creates_binance_adapter_for_user(self) -> None:

@@ -214,25 +214,35 @@ class DemoValidationReport:
         """
         Evaluate if demo validation passes for live trading.
 
-        Criteria:
+        Blocking criteria (must pass):
         - Zero reconciliation mismatches
-        - Zero unhandled errors
+        - Minimum orders executed
+        - Error rate within threshold
+
+        Advisory criteria (warnings, non-blocking):
         - Emergency stop tested
         - Pause/resume tested
-        - Minimum orders executed
+
+        [A-M3] Emergency stop and pause/resume are operational safety tests.
+        Not performing them during a demo run should not block readiness —
+        they are recorded as recommendations for the operator to complete
+        before going live, not as failures.
         """
         issues = []
+        warnings = []
 
         if self.total_metrics.reconciliation_mismatches > 0:
             issues.append(
                 f"Reconciliation mismatches: {self.total_metrics.reconciliation_mismatches}"
             )
 
+        # [A-M3] Advisory: emergency stop not tested is a recommendation, not a blocker
         if self.total_metrics.emergency_stops == 0:
-            issues.append("Emergency stop not tested")
+            warnings.append("Emergency stop not tested — recommend testing before live")
 
+        # [A-M3] Advisory: pause/resume not tested is a recommendation, not a blocker
         if self.total_metrics.pause_resume_cycles == 0:
-            issues.append("Pause/resume not tested")
+            warnings.append("Pause/resume not tested — recommend testing before live")
 
         if self.total_metrics.orders_submitted < 10:
             issues.append(
@@ -247,8 +257,11 @@ class DemoValidationReport:
 
         if self.ready_for_live:
             self.recommendations.append("Demo validation passed. Ready for live trading approval.")
+            # [A-M3] Surface advisory warnings even on pass
+            self.recommendations.extend(warnings)
         else:
             self.recommendations.append("Resolve issues before proceeding to live trading.")
+            self.recommendations.extend(warnings)
 
         return self.ready_for_live
 
@@ -591,10 +604,10 @@ class DemoTradingService:
         # Fallback: fetch from exchange via adapter
         try:
             # Access the adapter through execution engine
+            # [D-M8] get_ticker now returns a domain Ticker model
             ticker = await self._execution_engine._adapter.get_ticker(market_id)
-            last_price_str = ticker.get("last") or ticker.get("price") or ticker.get("lastPrice")
-            if last_price_str:
-                return Decimal(str(last_price_str))
+            if ticker.last_price > Decimal("0"):
+                return ticker.last_price
         except Exception as e:
             logger.warning(
                 "get_current_price_failed",

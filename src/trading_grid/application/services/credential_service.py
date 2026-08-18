@@ -197,7 +197,8 @@ class CredentialService:
         api_secret: str,
         passphrase: str | None = None,
         actor: str = "system",
-        identity: Identity | None = None,
+        *,
+        identity: Identity,
     ) -> str:
         """
         Store (or replace) an encrypted credential for a user.
@@ -210,7 +211,9 @@ class CredentialService:
             api_secret: Plaintext API secret (encrypted before storage)
             passphrase: Plaintext passphrase (OKX only, encrypted before storage)
             actor: Who performed this action (for audit)
-            identity: Optional authenticated identity for RBAC tenant isolation
+            identity: [A-H8] REQUIRED authenticated identity for RBAC tenant isolation.
+                Use Identity(identity_id="system", identity_type="SYSTEM", role=Role.SYSTEM_ADMIN)
+                for system-level operations.
 
         Returns:
             credential_id of the stored credential
@@ -219,8 +222,8 @@ class CredentialService:
             PermissionError: If caller identity is not authorized
             ValueError: If exchange or environment is invalid
         """
-        # [A-H8] RBAC: verify identity ownership
-        if identity is not None and identity.identity_id != user_id and identity.role < Role.SYSTEM_ADMIN:
+        # [A-H8] RBAC: verify identity ownership (identity is now REQUIRED)
+        if identity.identity_id != user_id and identity.role < Role.SYSTEM_ADMIN:
             raise PermissionError(
                 f"User '{identity.identity_id}' is not authorized to manage credentials for '{user_id}'"
             )
@@ -317,7 +320,8 @@ class CredentialService:
         exchange: str,
         environment: str,
         actor: str = "system",
-        identity: Identity | None = None,
+        *,
+        identity: Identity,
     ) -> DecryptedCredential:
         """
         Retrieve and decrypt a credential for a user.
@@ -327,7 +331,9 @@ class CredentialService:
             exchange: Exchange ID ("OKX", "BINANCE", "BYBIT")
             environment: "DEMO" or "LIVE"
             actor: Who is accessing this credential (for audit)
-            identity: Optional authenticated identity for RBAC tenant isolation
+            identity: [A-H8] REQUIRED authenticated identity for RBAC tenant isolation.
+                Use Identity(identity_id="system", identity_type="SYSTEM", role=Role.SYSTEM_ADMIN)
+                for system-level operations.
 
         Returns:
             DecryptedCredential (in-memory only, never persist)
@@ -337,8 +343,8 @@ class CredentialService:
             CredentialNotFoundError: If no active credential exists
             CredentialEncryptionError: If decryption fails
         """
-        # [A-H8] RBAC: verify identity ownership
-        if identity is not None and identity.identity_id != user_id and identity.role < Role.SYSTEM_ADMIN:
+        # [A-H8] RBAC: verify identity ownership (identity is now REQUIRED)
+        if identity.identity_id != user_id and identity.role < Role.SYSTEM_ADMIN:
             raise PermissionError(
                 f"User '{identity.identity_id}' is not authorized to access credentials for '{user_id}'"
             )
@@ -425,7 +431,8 @@ class CredentialService:
         exchange: str,
         environment: str,
         actor: str = "system",
-        identity: Identity | None = None,
+        *,
+        identity: Identity,
     ) -> bool:
         """
         Revoke (soft-delete) a credential.
@@ -438,7 +445,9 @@ class CredentialService:
             exchange: Exchange ID
             environment: "DEMO" or "LIVE"
             actor: Who performed this action (for audit)
-            identity: Optional authenticated identity for RBAC tenant isolation
+            identity: [A-H8] REQUIRED authenticated identity for RBAC tenant isolation.
+                Use Identity(identity_id="system", identity_type="SYSTEM", role=Role.SYSTEM_ADMIN)
+                for system-level operations.
 
         Returns:
             True if a credential was revoked, False if not found
@@ -446,8 +455,8 @@ class CredentialService:
         Raises:
             PermissionError: If caller identity is not authorized
         """
-        # [A-H8] RBAC: verify identity ownership
-        if identity is not None and identity.identity_id != user_id and identity.role < Role.SYSTEM_ADMIN:
+        # [A-H8] RBAC: verify identity ownership (identity is now REQUIRED)
+        if identity.identity_id != user_id and identity.role < Role.SYSTEM_ADMIN:
             raise PermissionError(
                 f"User '{identity.identity_id}' is not authorized to revoke credentials for '{user_id}'"
             )

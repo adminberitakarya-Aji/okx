@@ -24,7 +24,7 @@ import structlog
 from trading_grid.config.settings import OKXSettings
 from trading_grid.domain.exchange.interface import ExchangeAdapter
 from trading_grid.domain.execution.models import Fill, Order, Position
-from trading_grid.domain.market.models import Candle, Market, OrderBook, OrderBookLevel
+from trading_grid.domain.market.models import Candle, Market, OrderBook, OrderBookLevel, Ticker
 from trading_grid.domain.shared.types import ExchangeId, ExecutionMode, MarketId
 from trading_grid.infrastructure.okx.rest_client import OKXAPIError, OKXRestClient
 from trading_grid.infrastructure.okx.websocket_client import OKXWebSocketClient
@@ -173,9 +173,17 @@ class OKXAdapter(ExchangeAdapter):
                 logger.warning("skip_instrument", inst_id=item.get("instId"), error=str(e))
         return markets
 
-    async def get_ticker(self, market_id: MarketId) -> dict[str, Any]:
-        """Get ticker for market."""
-        return await self._rest.get_ticker(market_id)
+    async def get_ticker(self, market_id: MarketId) -> Ticker:
+        """Get ticker for market. [D-M8] Returns normalized domain Ticker model."""
+        raw = await self._rest.get_ticker(market_id)
+        return Ticker(
+            market_id=market_id,
+            timestamp=datetime.now(UTC),
+            last_price=Decimal(str(raw.get("last") or raw.get("lastPx") or "0")),
+            bid_price=Decimal(str(raw["bidPx"])) if raw.get("bidPx") else None,
+            ask_price=Decimal(str(raw["askPx"])) if raw.get("askPx") else None,
+            volume_24h=Decimal(str(raw.get("vol24h") or raw.get("volCcy24h") or "0")),
+        )
 
     async def get_orderbook(self, market_id: MarketId, depth: int = 20) -> OrderBook:
         """Get order book for market."""

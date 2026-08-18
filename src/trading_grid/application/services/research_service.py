@@ -518,23 +518,18 @@ class ResearchService:
 
             if self._adapter is not None:
                 try:
+                    # [D-M8] get_ticker now returns a domain Ticker model
                     ticker = await self._adapter.get_ticker(market_id)
                     if ticker:
                         # Estimate volatility from bid-ask spread
-                        bid = ticker.get("bid")
-                        ask = ticker.get("ask")
-                        if bid and ask:
-                            bid_d = Decimal(str(bid))
-                            ask_d = Decimal(str(ask))
-                            if bid_d > 0:
-                                spread_pct = float((ask_d - bid_d) / bid_d)
-                                # Lower spread = more liquid = better for grid
-                                volume_score = max(0.0, min(1.0, 1.0 - spread_pct * 100))
+                        if ticker.bid_price and ticker.ask_price and ticker.bid_price > 0:
+                            spread_pct = float((ticker.ask_price - ticker.bid_price) / ticker.bid_price)
+                            # Lower spread = more liquid = better for grid
+                            volume_score = max(0.0, min(1.0, 1.0 - spread_pct * 100))
 
-                        # Use 24h change as volatility proxy
-                        change_24h = ticker.get("change_24h") or ticker.get("change24h")
-                        if change_24h is not None:
-                            volatility = abs(float(change_24h))
+                        # Use 24h high vs last price as volatility proxy
+                        if ticker.high_24h and ticker.last_price > 0:
+                            volatility = abs(float((ticker.high_24h - ticker.last_price) / ticker.last_price))
                 except Exception:
                     logger.debug("heuristic_market_data_failed", market_id=market_id)
 

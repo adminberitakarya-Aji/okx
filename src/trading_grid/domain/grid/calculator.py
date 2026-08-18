@@ -227,6 +227,11 @@ def validate_blueprint(blueprint: Blueprint) -> list[str]:
                     f"({lowest_geometric:.4f}) breaches lower price ({section.lower_price})"
                 )
 
+    # Note [D-M3]: In arithmetic mode, spacing is always uniform by construction:
+    # (upper-lower)/(count-1). The declared grid_spacing_pct only applies to
+    # geometric mode, so we do NOT validate consistency between them — they are
+    # fundamentally different spacing models.
+
     # Check section ordering (each section should be below previous)
     for i in range(1, len(blueprint.sections)):
         prev_section = blueprint.sections[i - 1]

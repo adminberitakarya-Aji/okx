@@ -405,10 +405,10 @@ class ModelTrainer:
             train_mask = ts_sorted < train_end_time
             test_mask = (ts_sorted >= train_end_time) & (ts_sorted < test_end_time)
 
-            X_train, y_train = X_sorted[train_mask], y_sorted[train_mask]
+            X_train_all, y_train_all = X_sorted[train_mask], y_sorted[train_mask]
             X_test, y_test = X_sorted[test_mask], y_sorted[test_mask]
 
-            if len(X_train) < 10 or len(X_test) < 5:
+            if len(X_train_all) < 10 or len(X_test) < 5:
                 logger.warning(
                     "walk_forward_fold_skipped",
                     fold_index=fold_idx,
@@ -416,20 +416,31 @@ class ModelTrainer:
                 )
                 continue
 
-            # Train model for this fold
-            fold_model = self.train(X_train, y_train, config=config, feature_names=feature_names)
+            # [R-M5] Split training data into train-proper and validation (calibration) set.
+            # The last 20% of the training window (by time order) is held out for
+            # calibration fitting, ensuring the calibrator is actually trained.
+            val_split_idx = max(1, int(len(X_train_all) * 0.8))
+            X_train, y_train = X_train_all[:val_split_idx], y_train_all[:val_split_idx]
+            X_val, y_val = X_train_all[val_split_idx:], y_train_all[val_split_idx:]
+
+            # Need minimum samples in both splits
+            if len(X_train) < 10 or len(X_val) < 5:
+                # Fall back: use all data for training, no calibration
+                X_train, y_train = X_train_all, y_train_all
+                X_val, y_val = None, None
+
+            # Train model for this fold with validation set for calibration
+            fold_model = self.train(
+                X_train, y_train, X_val=X_val, y_val=y_val,
+                config=config, feature_names=feature_names,
+            )
 
             if fold_model.status == ModelStatus.FAILED:
                 continue
 
-            # [R-M5] Evaluate on test using calibrated estimator when available
-            # Calibrated estimator produces more reliable probability scores
-            eval_estimator = (
-                fold_model.calibrator
-                if fold_model.calibrator is not None
-                else fold_model.model
-            )
-            metrics = self._calculate_metrics(eval_estimator, X_test, y_test, config.model_type)
+            # [R-M5] Evaluate using the TrainedModel directly, which applies
+            # calibration internally via predict_proba() when a calibrator exists.
+            metrics = self._calculate_metrics(fold_model, X_test, y_test, config.model_type)
 
             fold = WalkForwardFold(
                 fold_index=fold_idx,

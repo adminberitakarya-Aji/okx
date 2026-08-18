@@ -173,18 +173,27 @@ class TestBybitAdapterMarketData:
         assert markets[0].tick_size == Decimal("0.01")
 
     async def test_get_ticker(self):
+        """[D-M8] get_ticker now returns a domain Ticker model."""
+        from trading_grid.domain.market.models import Ticker
+
         adapter = _make_adapter()
         adapter._rest.get_ticker.return_value = {
             "list": [{"symbol": "BTCUSDT", "lastPrice": "50000"}]
         }
         result = await adapter.get_ticker("BTC-USDT")
-        assert result["symbol"] == "BTCUSDT"
+        assert isinstance(result, Ticker)
+        assert result.market_id == "BTC-USDT"
+        assert result.last_price == Decimal("50000")
 
     async def test_get_ticker_empty(self):
+        """[D-M8] Empty ticker list returns Ticker with zero price."""
+        from trading_grid.domain.market.models import Ticker
+
         adapter = _make_adapter()
         adapter._rest.get_ticker.return_value = {"list": []}
         result = await adapter.get_ticker("BTC-USDT")
-        assert result == {}
+        assert isinstance(result, Ticker)
+        assert result.last_price == Decimal("0")
 
     async def test_get_orderbook(self):
         adapter = _make_adapter()

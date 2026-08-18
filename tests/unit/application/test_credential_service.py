@@ -207,6 +207,9 @@ class TestStoreCredentialValidation:
     @pytest.mark.asyncio
     async def test_invalid_exchange_raises(self) -> None:
         """Unsupported exchange raises ValueError."""
+        from trading_grid.application.services.authorization import Identity, Role
+
+        admin = Identity(identity_id="admin_1", identity_type="HUMAN", role=Role.SYSTEM_ADMIN)
         with pytest.raises(ValueError, match="Unsupported exchange"):
             await self.service.store_credential(
                 user_id="usr_123",
@@ -214,11 +217,15 @@ class TestStoreCredentialValidation:
                 environment="DEMO",
                 api_key="key",
                 api_secret="secret",
+                identity=admin,
             )
 
     @pytest.mark.asyncio
     async def test_invalid_environment_raises(self) -> None:
         """Invalid environment raises ValueError."""
+        from trading_grid.application.services.authorization import Identity, Role
+
+        admin = Identity(identity_id="admin_1", identity_type="HUMAN", role=Role.SYSTEM_ADMIN)
         with pytest.raises(ValueError, match="Invalid environment"):
             await self.service.store_credential(
                 user_id="usr_123",
@@ -227,11 +234,15 @@ class TestStoreCredentialValidation:
                 api_key="key",
                 api_secret="secret",
                 passphrase="pass",
+                identity=admin,
             )
 
     @pytest.mark.asyncio
     async def test_missing_api_key_raises(self) -> None:
         """Empty api_key raises ValueError."""
+        from trading_grid.application.services.authorization import Identity, Role
+
+        admin = Identity(identity_id="admin_1", identity_type="HUMAN", role=Role.SYSTEM_ADMIN)
         with pytest.raises(ValueError, match="api_key and api_secret are required"):
             await self.service.store_credential(
                 user_id="usr_123",
@@ -240,11 +251,15 @@ class TestStoreCredentialValidation:
                 api_key="",
                 api_secret="secret",
                 passphrase="pass",
+                identity=admin,
             )
 
     @pytest.mark.asyncio
     async def test_missing_api_secret_raises(self) -> None:
         """Empty api_secret raises ValueError."""
+        from trading_grid.application.services.authorization import Identity, Role
+
+        admin = Identity(identity_id="admin_1", identity_type="HUMAN", role=Role.SYSTEM_ADMIN)
         with pytest.raises(ValueError, match="api_key and api_secret are required"):
             await self.service.store_credential(
                 user_id="usr_123",
@@ -253,11 +268,15 @@ class TestStoreCredentialValidation:
                 api_key="key",
                 api_secret="",
                 passphrase="pass",
+                identity=admin,
             )
 
     @pytest.mark.asyncio
     async def test_okx_requires_passphrase(self) -> None:
         """OKX credential without passphrase raises ValueError."""
+        from trading_grid.application.services.authorization import Identity, Role
+
+        admin = Identity(identity_id="admin_1", identity_type="HUMAN", role=Role.SYSTEM_ADMIN)
         with pytest.raises(ValueError, match="OKX requires a passphrase"):
             await self.service.store_credential(
                 user_id="usr_123",
@@ -266,11 +285,15 @@ class TestStoreCredentialValidation:
                 api_key="key",
                 api_secret="secret",
                 passphrase=None,
+                identity=admin,
             )
 
     @pytest.mark.asyncio
     async def test_binance_does_not_require_passphrase(self) -> None:
         """Binance credential without passphrase passes validation."""
+        from trading_grid.application.services.authorization import Identity, Role
+
+        admin = Identity(identity_id="admin_1", identity_type="HUMAN", role=Role.SYSTEM_ADMIN)
         # Mock the database session
         mock_session = AsyncMock()
         mock_result = MagicMock()
@@ -286,6 +309,7 @@ class TestStoreCredentialValidation:
             api_key="key",
             api_secret="secret",
             passphrase=None,
+            identity=admin,
         )
         assert credential_id.startswith("cred_")
 
@@ -303,6 +327,9 @@ class TestStoreCredential:
     @pytest.mark.asyncio
     async def test_store_new_credential(self) -> None:
         """Storing a new credential encrypts data and returns credential_id."""
+        from trading_grid.application.services.authorization import Identity, Role
+
+        admin = Identity(identity_id="admin_1", identity_type="HUMAN", role=Role.SYSTEM_ADMIN)
         mock_session = AsyncMock()
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None  # No existing credential
@@ -318,6 +345,7 @@ class TestStoreCredential:
             api_secret="my-api-secret",
             passphrase="my-passphrase",
             actor="telegram:12345",
+            identity=admin,
         )
 
         assert credential_id.startswith("cred_")
@@ -328,6 +356,9 @@ class TestStoreCredential:
     @pytest.mark.asyncio
     async def test_stored_data_is_encrypted(self) -> None:
         """Plaintext credentials must not be stored in the model."""
+        from trading_grid.application.services.authorization import Identity, Role
+
+        admin = Identity(identity_id="admin_1", identity_type="HUMAN", role=Role.SYSTEM_ADMIN)
         mock_session = AsyncMock()
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None
@@ -350,6 +381,7 @@ class TestStoreCredential:
             api_key="plaintext-key",
             api_secret="plaintext-secret",
             passphrase="plaintext-pass",
+            identity=admin,
         )
 
         # Find the UserCredentialModel that was added
@@ -384,6 +416,9 @@ class TestGetCredential:
     @pytest.mark.asyncio
     async def test_get_nonexistent_credential_raises(self) -> None:
         """Getting a credential that doesn't exist raises CredentialNotFoundError."""
+        from trading_grid.application.services.authorization import Identity, Role
+
+        admin = Identity(identity_id="admin_1", identity_type="HUMAN", role=Role.SYSTEM_ADMIN)
         mock_session = AsyncMock()
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None
@@ -396,13 +431,16 @@ class TestGetCredential:
                 user_id="usr_123",
                 exchange="OKX",
                 environment="DEMO",
+                identity=admin,
             )
 
     @pytest.mark.asyncio
     async def test_get_credential_decrypts_correctly(self) -> None:
         """get_credential returns decrypted values."""
+        from trading_grid.application.services.authorization import Identity, Role
         from trading_grid.infrastructure.database.models import UserCredentialModel
 
+        admin = Identity(identity_id="admin_1", identity_type="HUMAN", role=Role.SYSTEM_ADMIN)
         # Create a mock credential model with encrypted data
         mock_cred = MagicMock(spec=UserCredentialModel)
         mock_cred.credential_id = "cred_abc123"
@@ -422,6 +460,7 @@ class TestGetCredential:
             user_id="usr_123",
             exchange="OKX",
             environment="DEMO",
+            identity=admin,
         )
 
         assert cred.api_key == "decrypted-key"
@@ -444,6 +483,9 @@ class TestRevokeCredential:
     @pytest.mark.asyncio
     async def test_revoke_nonexistent_returns_false(self) -> None:
         """Revoking a nonexistent credential returns False."""
+        from trading_grid.application.services.authorization import Identity, Role
+
+        admin = Identity(identity_id="admin_1", identity_type="HUMAN", role=Role.SYSTEM_ADMIN)
         mock_session = AsyncMock()
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None
@@ -455,14 +497,17 @@ class TestRevokeCredential:
             user_id="usr_123",
             exchange="OKX",
             environment="DEMO",
+            identity=admin,
         )
         assert result is False
 
     @pytest.mark.asyncio
     async def test_revoke_existing_returns_true(self) -> None:
         """Revoking an existing credential returns True and sets status."""
+        from trading_grid.application.services.authorization import Identity, Role
         from trading_grid.infrastructure.database.models import UserCredentialModel
 
+        admin = Identity(identity_id="admin_1", identity_type="HUMAN", role=Role.SYSTEM_ADMIN)
         mock_cred = MagicMock(spec=UserCredentialModel)
         mock_cred.credential_id = "cred_abc123"
         mock_cred.status = "ACTIVE"
@@ -479,6 +524,7 @@ class TestRevokeCredential:
             user_id="usr_123",
             exchange="OKX",
             environment="DEMO",
+            identity=admin,
         )
 
         assert result is True

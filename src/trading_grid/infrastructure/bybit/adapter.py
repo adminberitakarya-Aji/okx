@@ -30,7 +30,7 @@ import structlog
 from trading_grid.config.settings import BybitSettings
 from trading_grid.domain.exchange.interface import ExchangeAdapter
 from trading_grid.domain.execution.models import Fill, Order, Position
-from trading_grid.domain.market.models import Candle, Market, OrderBook, OrderBookLevel
+from trading_grid.domain.market.models import Candle, Market, OrderBook, OrderBookLevel, Ticker
 from trading_grid.domain.shared.types import ExchangeId, ExecutionMode, MarketId
 from trading_grid.infrastructure.bybit.rest_client import BybitAPIError, BybitRestClient
 from trading_grid.infrastructure.bybit.websocket_client import BybitWebSocketClient
@@ -84,14 +84,20 @@ class BybitAdapter(ExchangeAdapter):
     - Reconciliation after disconnects
     """
 
-    def __init__(self, settings: BybitSettings) -> None:
+    def __init__(self, settings: BybitSettings, default_quote_currency: str = "USDT") -> None:
         """
         Initialize Bybit adapter.
 
         Args:
             settings: Bybit API settings
+            default_quote_currency: [I-M6] Default quote currency for balance-derived
+                positions. Bybit spot has no positions endpoint, so positions are
+                derived from wallet balances. The actual trading pair quote currency
+                is not available from balances alone; this parameter provides a
+                configurable default instead of hardcoding "USDT".
         """
         self._settings = settings
+        self._default_quote_currency = default_quote_currency
         self._rest = BybitRestClient(settings)
         self._public_ws: BybitWebSocketClient | None = None
         self._private_ws: BybitWebSocketClient | None = None
@@ -100,6 +106,8 @@ class BybitAdapter(ExchangeAdapter):
         self._needs_reconciliation = False
         self._order_update_handlers: list[Callable[[dict[str, Any]], None]] = []
         self._ticker_handlers: list[Callable[[dict[str, Any]], None]] = []
+        # Cache of base_asset -> quote_currency from instruments (populated lazily)
+        self._quote_currency_map: dict[str, str] = {}
 
     @property
     def exchange_id(self) -> ExchangeId:
@@ -251,12 +259,22 @@ class BybitAdapter(ExchangeAdapter):
 
         return markets
 
-    async def get_ticker(self, market_id: MarketId) -> dict[str, Any]:
-        """Get ticker for market."""
+    async def get_ticker(self, market_id: MarketId) -> Ticker:
+        """Get ticker for market. [D-M8] Returns normalized domain Ticker model."""
         symbol = to_concatenated_symbol(market_id)
         data = await self._rest.get_ticker(symbol, category="spot")
         ticker_list = data.get("list", [])
-        return ticker_list[0] if ticker_list else {}
+        raw = ticker_list[0] if ticker_list else {}
+        return Ticker(
+            market_id=market_id,
+            timestamp=datetime.now(UTC),
+            last_price=Decimal(str(raw.get("lastPrice") or "0")),
+            bid_price=Decimal(str(raw["bid1Price"])) if raw.get("bid1Price") else None,
+            ask_price=Decimal(str(raw["ask1Price"])) if raw.get("ask1Price") else None,
+            volume_24h=Decimal(str(raw.get("volume24h") or "0")),
+            quote_volume_24h=Decimal(str(raw.get("turnover24h") or "0")),
+            high_24h=Decimal(str(raw["highPrice24h"])) if raw.get("highPrice24h") else None,
+        )
 
     async def get_orderbook(self, market_id: MarketId, depth: int = 20) -> OrderBook:
         """Get order book for market."""
@@ -333,6 +351,26 @@ class BybitAdapter(ExchangeAdapter):
 
         return balances
 
+    async def _ensure_quote_currency_map(self) -> None:
+        """
+        [I-M6] Lazily populate the base_asset -> quote_currency map from instruments.
+
+        This allows get_positions() to use the actual quote currency for each
+        asset instead of hardcoding "USDT".
+        """
+        if self._quote_currency_map:
+            return
+        try:
+            data = await self._rest.get_instruments(category="spot")
+            for item in data.get("list", []):
+                if item.get("status") == "Trading":
+                    base = item.get("baseCoin", "")
+                    quote = item.get("quoteCoin", "")
+                    if base and quote and base not in self._quote_currency_map:
+                        self._quote_currency_map[base] = quote
+        except Exception as e:
+            logger.warning("bybit_quote_map_populate_failed", error=str(e))
+
     async def get_positions(self) -> list[Position]:
         """
         Get current spot positions.
@@ -340,7 +378,12 @@ class BybitAdapter(ExchangeAdapter):
         Bybit spot has no positions endpoint — positions are derived from
         wallet balances. Average entry price is NOT available from balances
         and defaults to 0 (documented limitation).
+
+        [I-M6] The quote currency for each position is resolved dynamically
+        from instruments instead of hardcoding "USDT". Falls back to
+        the configured default_quote_currency if the asset is not found.
         """
+        await self._ensure_quote_currency_map()
         data = await self._rest.get_wallet_balance()
         positions = []
 
@@ -354,9 +397,11 @@ class BybitAdapter(ExchangeAdapter):
                     qty = Decimal(coin.get("walletBalance", "0") or "0")
 
                     if qty > 0 and asset not in quote_assets:
+                        # [I-M6] Resolve quote currency dynamically
+                        quote_ccy = self._quote_currency_map.get(asset, self._default_quote_currency)
                         position = Position(
                             position_id=f"{asset}-spot",
-                            market_id=f"{asset}-USDT",
+                            market_id=f"{asset}-{quote_ccy}",
                             quantity=qty,
                             average_entry_price=Decimal("0"),
                         )
