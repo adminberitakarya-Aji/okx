@@ -22,12 +22,21 @@ from typing import Any
 
 import httpx
 import structlog
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from trading_grid.config.settings import OKXSettings
 from trading_grid.domain.exchange.errors import ExchangeAPIError
 
 logger = structlog.get_logger()
+
+
+def _should_retry_http_error(exc: BaseException) -> bool:
+    """Return True for transient network/server errors (429, 5xx, timeouts). Do NOT retry 4xx errors."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code == 429 or exc.response.status_code >= 500
+    if isinstance(exc, (httpx.TransportError, httpx.TimeoutException)):
+        return True
+    return False
 
 
 class OKXRestClient:
@@ -58,14 +67,10 @@ class OKXRestClient:
 
     async def _ensure_client(self) -> httpx.AsyncClient:
         """Ensure HTTP client is created."""
-        if self._client is None:
-            headers = {
-                "Content-Type": "application/json",
-            }
-            # Add demo trading header if in demo mode
+        if self._client is None or self._client.is_closed:
+            headers = {"Content-Type": "application/json"}
             if self._settings.demo_mode:
                 headers["x-simulated-trading"] = "1"
-
             self._client = httpx.AsyncClient(
                 base_url=self._settings.base_url,
                 headers=headers,
@@ -74,28 +79,24 @@ class OKXRestClient:
         return self._client
 
     async def close(self) -> None:
-        """Close the HTTP client."""
-        if self._client is not None:
+        """Close HTTP client."""
+        if self._client and not self._client.is_closed:
             await self._client.aclose()
             self._client = None
 
     def _get_timestamp(self) -> str:
-        """Get ISO 8601 timestamp for request signing."""
+        """Get ISO format timestamp for OKX API."""
         return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
     def _sign_request(self, timestamp: str, method: str, path: str, body: str = "") -> str:
         """
-        Sign request using HMAC-SHA256.
+        Sign request with HMAC-SHA256.
 
-        OKX signature format: timestamp + method + requestPath + body
+        Format: timestamp + method + path + body
         """
-        message = f"{timestamp}{method}{path}{body}"
-        secret = self._settings.api_secret.get_secret_value()
-        signature = hmac.new(
-            secret.encode("utf-8"),
-            message.encode("utf-8"),
-            hashlib.sha256,
-        ).digest()
+        message = f"{timestamp}{method.upper()}{path}{body}"
+        secret = self._settings.api_secret.get_secret_value().encode("utf-8")
+        signature = hmac.new(secret, message.encode("utf-8"), hashlib.sha256).digest()
         return base64.b64encode(signature).decode("utf-8")
 
     def _get_auth_headers(self, method: str, path: str, body: str = "") -> dict[str, str]:
@@ -111,6 +112,7 @@ class OKXRestClient:
         }
 
     @retry(
+        retry=retry_if_exception(_should_retry_http_error),
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
     )

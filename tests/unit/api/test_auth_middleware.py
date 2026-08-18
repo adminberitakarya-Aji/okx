@@ -19,7 +19,7 @@ from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
 from trading_grid.api.middleware.auth import DEV_API_KEYS, AuthMiddleware
-from trading_grid.config.settings import AppSettings, Environment, Settings
+from trading_grid.config.settings import AppSettings, Environment, Settings, TelegramSettings
 
 
 def _make_settings(env: Environment, debug: bool, dev_auth_enabled: bool) -> Settings:
@@ -30,7 +30,8 @@ def _make_settings(env: Environment, debug: bool, dev_auth_enabled: bool) -> Set
         dev_auth_enabled=dev_auth_enabled,
         _env_file=None,
     )
-    return Settings(app=app, _env_file=None)
+    telegram = TelegramSettings(open_access=False, _env_file=None)
+    return Settings(app=app, telegram=telegram, _env_file=None)
 
 
 def _build_app() -> FastAPI:

@@ -22,6 +22,7 @@ from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
@@ -217,8 +218,9 @@ class UserCredentialModel(Base, TimestampMixin):
     )
 
 
-# Backward-compatible alias
-OKXIntegrationModel = ExchangeIntegrationModel
+# Backward-compatible alias (deprecated: prefer ExchangeIntegrationModel)
+# Retained for legacy external integrations and will be removed in future major release.
+OKXIntegrationModel: type[ExchangeIntegrationModel] = ExchangeIntegrationModel
 
 
 class PairingSessionModel(Base, TimestampMixin):
@@ -365,6 +367,14 @@ class OrderModel(Base, TimestampMixin):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
+        CheckConstraint(
+            "status IN ('PENDING', 'SUBMITTED', 'ACKNOWLEDGED', 'PARTIALLY_FILLED', 'FILLED', 'CANCELLED', 'REJECTED')",
+            name="ck_orders_status",
+        ),
+        CheckConstraint(
+            "side IN ('BUY', 'SELL')",
+            name="ck_orders_side",
+        ),
         Index("ix_orders_market_status", "market_id", "status"),
         Index("ix_orders_blueprint", "blueprint_id"),
         Index("ix_orders_user", "user_id"),
@@ -397,10 +407,13 @@ class FillModel(Base, TimestampMixin):
     quantity: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
     fee: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False, default=Decimal("0"))
     filled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # [DB-L2] Direct linkage to blueprint for reporting and PnL aggregation without order joins
+    blueprint_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
 
     __table_args__ = (
         Index("ix_fills_order", "order_id"),
         Index("ix_fills_user", "user_id"),
+        Index("ix_fills_blueprint", "blueprint_id"),
     )
 
 
@@ -458,6 +471,9 @@ class AuditLogModel(Base):
     details_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
     success: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # [I-L4] Added for multi-exchange audit filtering
+    exchange: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    user_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
 
     __table_args__ = (
         Index("ix_audit_logs_actor", "actor"),

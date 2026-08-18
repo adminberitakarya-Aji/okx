@@ -23,7 +23,7 @@ from typing import Any
 
 import httpx
 import structlog
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from trading_grid.config.settings import BybitSettings
 from trading_grid.domain.exchange.errors import ExchangeAPIError
@@ -31,6 +31,15 @@ from trading_grid.domain.exchange.errors import ExchangeAPIError
 logger = structlog.get_logger()
 
 RECV_WINDOW = "5000"
+
+
+def _should_retry_http_error(exc: BaseException) -> bool:
+    """Return True for transient network/server errors (429, 5xx, timeouts). Do NOT retry 4xx errors."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code == 429 or exc.response.status_code >= 500
+    if isinstance(exc, (httpx.TransportError, httpx.TimeoutException)):
+        return True
+    return False
 
 
 class BybitAPIError(ExchangeAPIError):
@@ -79,7 +88,7 @@ class BybitRestClient:
 
     async def _ensure_client(self) -> httpx.AsyncClient:
         """Ensure HTTP client is created."""
-        if self._client is None:
+        if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(
                 base_url=self._settings.effective_base_url,
                 timeout=self._settings.timeout,
@@ -87,8 +96,8 @@ class BybitRestClient:
         return self._client
 
     async def close(self) -> None:
-        """Close the HTTP client."""
-        if self._client is not None:
+        """Close HTTP client."""
+        if self._client and not self._client.is_closed:
             await self._client.aclose()
             self._client = None
 
@@ -96,11 +105,11 @@ class BybitRestClient:
         """
         Sign request using HMAC-SHA256.
 
-        Bybit v5 signature: HMAC_SHA256(secret, timestamp + api_key + recv_window + params_str)
+        Bybit signature: HMAC_SHA256(secret, timestamp + key + recv_window + params_str)
         """
-        api_key = self._settings.api_key.get_secret_value()
+        key = self._settings.api_key.get_secret_value()
         secret = self._settings.api_secret.get_secret_value()
-        message = f"{timestamp}{api_key}{RECV_WINDOW}{params_str}"
+        message = f"{timestamp}{key}{RECV_WINDOW}{params_str}"
         signature = hmac.new(
             secret.encode("utf-8"),
             message.encode("utf-8"),
@@ -121,6 +130,7 @@ class BybitRestClient:
         }
 
     @retry(
+        retry=retry_if_exception(_should_retry_http_error),
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
     )

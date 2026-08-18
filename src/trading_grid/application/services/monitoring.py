@@ -16,6 +16,7 @@ Key domain rules:
 
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
@@ -211,7 +212,7 @@ class MonitoringService:
         """
         self._environment = environment
         self._alert_rules: dict[str, AlertRule] = {}
-        self._alerts: list[Alert] = []
+        self._alerts: deque[Alert] = deque(maxlen=1000)
         self._health_checks: dict[str, HealthCheck] = {}
         self._metrics: dict[str, float] = {}
 

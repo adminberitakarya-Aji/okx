@@ -547,8 +547,8 @@ class TestRegisterHandlers:
 
         # 9 command handlers (7 original + /connect + /disconnect from Phase 5)
         assert dp.message.register.call_count == 9
-        # 20 callback handlers (12 original + 4 grid control + 2 simulation + 2 blueprint)
-        assert dp.callback_query.register.call_count == 20
+        # 37 callback handlers (includes all menus, sub-actions, and controls)
+        assert dp.callback_query.register.call_count == 37
 
 
 class TestMultiExchangeContainer:

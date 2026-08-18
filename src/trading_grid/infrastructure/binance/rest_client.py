@@ -23,12 +23,21 @@ from urllib.parse import urlencode
 
 import httpx
 import structlog
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from trading_grid.config.settings import BinanceSettings
 from trading_grid.domain.exchange.errors import ExchangeAPIError
 
 logger = structlog.get_logger()
+
+
+def _should_retry_http_error(exc: BaseException) -> bool:
+    """Return True for transient network/server errors (429, 5xx, timeouts). Do NOT retry 4xx errors."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code == 429 or exc.response.status_code >= 500
+    if isinstance(exc, (httpx.TransportError, httpx.TimeoutException)):
+        return True
+    return False
 
 
 class BinanceAPIError(ExchangeAPIError):
@@ -77,7 +86,7 @@ class BinanceRestClient:
 
     async def _ensure_client(self) -> httpx.AsyncClient:
         """Ensure HTTP client is created."""
-        if self._client is None:
+        if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(
                 base_url=self._settings.effective_base_url,
                 timeout=self._settings.timeout,
@@ -85,8 +94,8 @@ class BinanceRestClient:
         return self._client
 
     async def close(self) -> None:
-        """Close the HTTP client."""
-        if self._client is not None:
+        """Close HTTP client."""
+        if self._client and not self._client.is_closed:
             await self._client.aclose()
             self._client = None
 
@@ -109,6 +118,7 @@ class BinanceRestClient:
         return {"X-MBX-APIKEY": self._settings.api_key.get_secret_value()}
 
     @retry(
+        retry=retry_if_exception(_should_retry_http_error),
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
     )

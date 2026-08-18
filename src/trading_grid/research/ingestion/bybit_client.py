@@ -30,7 +30,7 @@ from tenacity import (
 )
 
 from trading_grid.domain.market.models import Candle
-from trading_grid.infrastructure.exchange.symbols import to_concatenated_symbol
+from trading_grid.domain.market.symbols import to_concatenated_symbol
 
 if TYPE_CHECKING:
     from trading_grid.domain.shared.types import MarketId
@@ -220,6 +220,8 @@ class BybitHistoricalClient:
             current_url = f"{self.active_base_url}{endpoint}"
             try:
                 response = await self._client.get(current_url, params=params)
+                # [R-M4] Successful request — restore primary endpoint for future calls
+                self._current_endpoint_idx = 0
                 break
             except httpx.TransportError as exc:
                 if self._current_endpoint_idx + 1 < len(self._endpoints):

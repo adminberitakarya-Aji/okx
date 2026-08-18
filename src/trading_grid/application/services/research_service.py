@@ -10,6 +10,7 @@ This service bridges the research/ML pipeline with the application layer:
 Dependency rules: application/ may import domain/ and research/.
 """
 
+import asyncio
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -351,81 +352,84 @@ class ResearchService:
             logger.warning("ml_predictions_requires_adapter")
             return []
 
-        predictions: list[ModelPredictions] = []
         now = datetime.now(UTC)
+        sem = asyncio.Semaphore(5)
 
-        for market_id in market_ids:
-            try:
-                # Fetch candles for feature computation
-                candles = await self._adapter.get_candles(
-                    market_id=market_id,
-                    interval="1H",
-                    limit=MIN_CANDLES_FOR_ML + 50,  # Extra buffer
-                )
-
-                if not candles or len(candles) < MIN_CANDLES_FOR_ML:
-                    logger.debug(
-                        "insufficient_candles_for_ml",
+        async def _predict_market(market_id: MarketId) -> ModelPredictions | None:
+            async with sem:
+                try:
+                    # Fetch candles for feature computation
+                    candles = await self._adapter.get_candles(  # type: ignore[union-attr]
                         market_id=market_id,
-                        count=len(candles) if candles else 0,
+                        interval="1H",
+                        limit=MIN_CANDLES_FOR_ML + 50,  # Extra buffer
                     )
-                    continue
 
-                # Compute features
-                features = self._compute_features_from_candles(candles)
-                if features is None:
-                    logger.debug("feature_computation_failed", market_id=market_id)
-                    continue
+                    if not candles or len(candles) < MIN_CANDLES_FOR_ML:
+                        logger.debug(
+                            "insufficient_candles_for_ml",
+                            market_id=market_id,
+                            count=len(candles) if candles else 0,
+                        )
+                        return None
 
-                # Build feature vector in correct order
-                X = np.array([[features[col] for col in ML_FEATURE_COLUMNS]], dtype=np.float64)
+                    # Compute features
+                    features = self._compute_features_from_candles(candles)
+                    if features is None:
+                        logger.debug("feature_computation_failed", market_id=market_id)
+                        return None
 
-                # Run inference through all loaded models
-                pred = ModelPredictions(
-                    market_id=market_id,
-                    blueprint_id="ml",
-                    observation_timestamp=now,
-                )
+                    # Build feature vector in correct order
+                    X = np.array([[features[col] for col in ML_FEATURE_COLUMNS]], dtype=np.float64)
 
-                # Primary classifier: P(positive PnL)
-                if ModelType.PRIMARY_CLASSIFIER in self._loaded_models:
-                    model = self._loaded_models[ModelType.PRIMARY_CLASSIFIER]
-                    proba = model.predict_proba(X)
-                    pred.positive_pnl_probability = float(proba[0][1])
+                    # Run inference through all loaded models
+                    pred = ModelPredictions(
+                        market_id=market_id,
+                        blueprint_id="ml",
+                        observation_timestamp=now,
+                    )
 
-                # Net PnL regressor
-                if ModelType.NET_PNL_REGRESSOR in self._loaded_models:
-                    model = self._loaded_models[ModelType.NET_PNL_REGRESSOR]
-                    pred.expected_net_pnl_return = float(model.predict(X)[0])
+                    # Primary classifier: P(positive PnL)
+                    if ModelType.PRIMARY_CLASSIFIER in self._loaded_models:
+                        model = self._loaded_models[ModelType.PRIMARY_CLASSIFIER]
+                        proba = model.predict_proba(X)
+                        pred.positive_pnl_probability = float(proba[0][1])
 
-                # Drawdown regressor
-                if ModelType.DRAWDOWN_REGRESSOR in self._loaded_models:
-                    model = self._loaded_models[ModelType.DRAWDOWN_REGRESSOR]
-                    pred.expected_max_drawdown = float(model.predict(X)[0])
+                    # Net PnL regressor
+                    if ModelType.NET_PNL_REGRESSOR in self._loaded_models:
+                        model = self._loaded_models[ModelType.NET_PNL_REGRESSOR]
+                        pred.expected_net_pnl_return = float(model.predict(X)[0])
 
-                # Capital utilization regressor
-                if ModelType.CAPITAL_UTILIZATION_REGRESSOR in self._loaded_models:
-                    model = self._loaded_models[ModelType.CAPITAL_UTILIZATION_REGRESSOR]
-                    pred.expected_capital_utilization = float(model.predict(X)[0])
+                    # Drawdown regressor
+                    if ModelType.DRAWDOWN_REGRESSOR in self._loaded_models:
+                        model = self._loaded_models[ModelType.DRAWDOWN_REGRESSOR]
+                        pred.expected_max_drawdown = float(model.predict(X)[0])
 
-                # Recovery classifier
-                if ModelType.RECOVERY_CLASSIFIER in self._loaded_models:
-                    model = self._loaded_models[ModelType.RECOVERY_CLASSIFIER]
-                    proba = model.predict_proba(X)
-                    pred.recovery_probability = float(proba[0][1])
+                    # Capital utilization regressor
+                    if ModelType.CAPITAL_UTILIZATION_REGRESSOR in self._loaded_models:
+                        model = self._loaded_models[ModelType.CAPITAL_UTILIZATION_REGRESSOR]
+                        pred.expected_capital_utilization = float(model.predict(X)[0])
 
-                # Capital exhaustion classifier
-                if ModelType.CAPITAL_EXHAUSTION_CLASSIFIER in self._loaded_models:
-                    model = self._loaded_models[ModelType.CAPITAL_EXHAUSTION_CLASSIFIER]
-                    proba = model.predict_proba(X)
-                    pred.capital_exhaustion_probability = float(proba[0][1])
+                    # Recovery classifier
+                    if ModelType.RECOVERY_CLASSIFIER in self._loaded_models:
+                        model = self._loaded_models[ModelType.RECOVERY_CLASSIFIER]
+                        proba = model.predict_proba(X)
+                        pred.recovery_probability = float(proba[0][1])
 
-                predictions.append(pred)
+                    # Capital exhaustion classifier
+                    if ModelType.CAPITAL_EXHAUSTION_CLASSIFIER in self._loaded_models:
+                        model = self._loaded_models[ModelType.CAPITAL_EXHAUSTION_CLASSIFIER]
+                        proba = model.predict_proba(X)
+                        pred.capital_exhaustion_probability = float(proba[0][1])
 
-            except Exception as e:
-                logger.warning("ml_prediction_failed", market_id=market_id, error=str(e))
+                    return pred
 
-        return predictions
+                except Exception as e:
+                    logger.warning("ml_prediction_failed", market_id=market_id, error=str(e))
+                    return None
+
+        results = await asyncio.gather(*[_predict_market(m) for m in market_ids], return_exceptions=False)
+        return [r for r in results if r is not None]
 
     async def rank_markets(
         self,
@@ -702,7 +706,7 @@ class ResearchService:
         )
 
         simulator = GridSimulator(config)
-        result = simulator.run(blueprint=blueprint, candles=candles)
+        result = await asyncio.to_thread(simulator.run, blueprint=blueprint, candles=candles)
 
         # Store simulation result for history display
         self._simulation_results.append(result)

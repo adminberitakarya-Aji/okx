@@ -295,6 +295,11 @@ class AuditService:
                 filtered[key] = "[REDACTED]"
             elif isinstance(value, dict):
                 filtered[key] = self._filter_sensitive_data(value)
+            elif isinstance(value, list):
+                filtered[key] = [
+                    self._filter_sensitive_data(item) if isinstance(item, dict) else item
+                    for item in value
+                ]
             else:
                 filtered[key] = value
         return filtered

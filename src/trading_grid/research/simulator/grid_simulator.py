@@ -556,7 +556,7 @@ class GridSimulator:
 
                             if matching_lot is not None:
                                 # Check minimum profitable exit
-                                sell_price_val = lot.target_sell_price
+                                sell_price_val = matching_lot.target_sell_price
                                 sell_proceeds = matching_lot.quantity * sell_price_val
                                 sell_fee = sell_proceeds * Decimal(str(self.config.sell_fee_rate))
                                 slippage = self.config.effective_slippage()
@@ -583,7 +583,7 @@ class GridSimulator:
                                 matching_lot.sell_price = sell_price_val
                                 matching_lot.sell_fee = sell_fee
                                 matching_lot.realized_pnl = lot_pnl
-                                ss.grid_states[level_idx] = GridLevelState.COMPLETED
+                                ss.grid_states[level_idx] = GridLevelState.ELIGIBLE
 
                                 self._add_event(
                                     result,
@@ -604,6 +604,9 @@ class GridSimulator:
                                     asset_after=asset_quantity,
                                     realized_pnl=lot_pnl,
                                 )
+
+                # Update prev_close to current intrabar price point
+                prev_close = price
 
             # Update equity and drawdown
             equity = quote_balance + asset_quantity * candle.close
@@ -644,12 +647,14 @@ class GridSimulator:
             else 0.0
         )
 
-        # Coin accumulation
-        coin_accumulated = asset_quantity
+        # Coin accumulation — count only lots bought during simulation
+        # (excludes initial_asset_balance to avoid distorting avg acquisition price)
+        traded_open_lots = [lot for lot in open_lots if lot.status == "OPEN"]
+        coin_accumulated = sum(lot.quantity for lot in traded_open_lots)
         avg_acquisition: Decimal | None = None
-        total_cost = sum(lot.effective_buy_cost for lot in open_lots if lot.status == "OPEN")
-        if asset_quantity > 0 and total_cost > 0:
-            avg_acquisition = total_cost / asset_quantity
+        total_cost = sum(lot.effective_buy_cost for lot in traded_open_lots)
+        if coin_accumulated > 0 and total_cost > 0:
+            avg_acquisition = total_cost / coin_accumulated
 
         # Populate result
         result.final_quote_balance = quote_balance

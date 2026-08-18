@@ -13,7 +13,9 @@ Security rules:
 3. DEMO and LIVE use separate credentials
 """
 
+import asyncio
 from collections.abc import Callable
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -34,14 +36,7 @@ class OKXAdapter(ExchangeAdapter):
     """
     OKX Exchange Adapter.
 
-    Implements the exchange-agnostic ExchangeAdapter interface for OKX.
-
-    Provides unified interface for:
-    - Market data queries
-    - Account queries
-    - Order placement and management
-    - Real-time updates via WebSocket
-    - Reconciliation after disconnects
+    Implements ExchangeAdapter interface for OKX API v5.
     """
 
     def __init__(self, settings: OKXSettings) -> None:
@@ -55,6 +50,8 @@ class OKXAdapter(ExchangeAdapter):
         self._rest = OKXRestClient(settings)
         self._public_ws: OKXWebSocketClient | None = None
         self._private_ws: OKXWebSocketClient | None = None
+        self._public_ws_task: asyncio.Task[None] | None = None
+        self._private_ws_task: asyncio.Task[None] | None = None
         self._needs_reconciliation = False
         self._order_update_handlers: list[Callable[[dict[str, Any]], None]] = []
         self._ticker_handlers: list[Callable[[dict[str, Any]], None]] = []
@@ -71,7 +68,7 @@ class OKXAdapter(ExchangeAdapter):
 
     @property
     def needs_reconciliation(self) -> bool:
-        """Check if reconciliation is needed after disconnect."""
+        """Check if reconciliation is needed."""
         return self._needs_reconciliation
 
     # =========================================================================
@@ -79,17 +76,20 @@ class OKXAdapter(ExchangeAdapter):
     # =========================================================================
 
     async def connect(self) -> None:
-        """Connect to OKX (REST is stateless, WebSocket connects)."""
-        logger.info("okx_adapter_connecting", mode=self.mode)
-        # REST client is stateless, no explicit connection needed
+        """Connect to OKX."""
+        logger.info("okx_adapter_connected", mode=self.mode)
         # WebSocket connections are started separately as needed
 
     async def disconnect(self) -> None:
         """Disconnect from OKX."""
         if self._public_ws:
             await self._public_ws.disconnect()
+        if self._public_ws_task and not self._public_ws_task.done():
+            self._public_ws_task.cancel()
         if self._private_ws:
             await self._private_ws.disconnect()
+        if self._private_ws_task and not self._private_ws_task.done():
+            self._private_ws_task.cancel()
         await self._rest.close()
         logger.info("okx_adapter_disconnected")
 
@@ -99,6 +99,8 @@ class OKXAdapter(ExchangeAdapter):
             self._public_ws = OKXWebSocketClient(self._settings, private=False)
             self._public_ws.on_message(self._handle_public_message)
             self._public_ws.on_disconnect(self._handle_disconnect)
+        if self._public_ws_task is None or self._public_ws_task.done():
+            self._public_ws_task = asyncio.create_task(self._public_ws.connect())
 
     async def start_private_ws(self) -> None:
         """Start private WebSocket for order updates."""
@@ -106,6 +108,8 @@ class OKXAdapter(ExchangeAdapter):
             self._private_ws = OKXWebSocketClient(self._settings, private=True)
             self._private_ws.on_message(self._handle_private_message)
             self._private_ws.on_disconnect(self._handle_disconnect)
+        if self._private_ws_task is None or self._private_ws_task.done():
+            self._private_ws_task = asyncio.create_task(self._private_ws.connect())
 
     def _handle_disconnect(self) -> None:
         """Handle WebSocket disconnect - mark for reconciliation."""
@@ -408,7 +412,7 @@ class OKXAdapter(ExchangeAdapter):
             "pending_orders": len(pending_orders),
             "positions": len(positions),
             "balances": len(balances),
-            "reconciled_at": "now",
+            "reconciled_at": datetime.now(UTC).isoformat(),
         }
 
         logger.info("reconciliation_complete", **result)

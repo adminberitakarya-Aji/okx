@@ -58,8 +58,8 @@ class Order:
     order_id: OrderId
     market_id: MarketId
     side: OrderSide
+    quantity: Quantity
     order_type: OrderType = "MARKET"
-    quantity: Quantity = Decimal("0")
     price: Price | None = None
     status: OrderStatus = "PENDING"
     exchange_order_id: str | None = None
@@ -88,8 +88,8 @@ class Order:
 
     @property
     def remaining_quantity(self) -> Quantity:
-        """Get remaining quantity to fill."""
-        return self.quantity - self.filled_quantity
+        """Get remaining quantity to fill (clamped to 0 on overfill)."""
+        return max(Decimal("0"), self.quantity - self.filled_quantity)
 
     @property
     def fill_ratio(self) -> Decimal:
@@ -135,10 +135,18 @@ class Fill:
 
     @property
     def effective_cost(self) -> Decimal:
-        """Calculate effective cost including fees."""
+        """Calculate effective cost in quote currency including fees."""
+        # Convert base currency fee (e.g. BTC on BTC-USDT) to quote notional
+        market_parts = self.market_id.split("-") if "-" in self.market_id else self.market_id.split("/")
+        base_asset = market_parts[0] if market_parts else ""
+        if self.fee_currency and self.fee_currency == base_asset:
+            fee_in_quote = self.fee * self.price
+        else:
+            fee_in_quote = self.fee
+
         if self.side == "BUY":
-            return self.notional_value + self.fee
-        return self.notional_value - self.fee
+            return self.notional_value + fee_in_quote
+        return self.notional_value - fee_in_quote
 
 
 @dataclass

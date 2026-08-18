@@ -20,7 +20,8 @@ The generator uses the suitability score and risk level to determine:
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
-from uuid import uuid4
+from hashlib import sha256
+from json import dumps as json_dumps
 
 import structlog
 
@@ -125,7 +126,22 @@ class BlueprintGenerator:
             total_capital=total_capital,
         )
 
-        blueprint_id = f"BP-{uuid4().hex[:12].upper()}"
+        # [R-M8] Deterministic Blueprint ID: hash of stable input parameters so that
+        # identical recommendations and capital inputs always produce the same Blueprint ID.
+        # This enables idempotent re-runs and reliable audit trail correlation.
+        _id_payload = json_dumps(
+            {
+                "market_id": recommendation.market_id,
+                "total_capital": str(total_capital),
+                "section_count": section_count,
+                "spacing": str(spacing),
+                "risk_level": risk_level.value,
+                "range_pct": str(range_pct),
+                "generator_version": BLUEPRINT_GENERATOR_VERSION,
+            },
+            sort_keys=True,
+        )
+        blueprint_id = f"BP-{sha256(_id_payload.encode()).hexdigest()[:12].upper()}"
 
         blueprint = Blueprint(
             blueprint_id=blueprint_id,
@@ -262,7 +278,17 @@ class BlueprintGenerator:
             status="INACTIVE",
         )
 
-        blueprint_id = f"BP-{uuid4().hex[:12].upper()}"
+        # [R-M8] Deterministic ID for generate_default as well
+        _id_payload = json_dumps(
+            {
+                "market_id": market_id,
+                "total_capital": str(total_capital),
+                "mode": "default_fallback",
+                "generator_version": BLUEPRINT_GENERATOR_VERSION,
+            },
+            sort_keys=True,
+        )
+        blueprint_id = f"BP-{sha256(_id_payload.encode()).hexdigest()[:12].upper()}"
 
         blueprint = Blueprint(
             blueprint_id=blueprint_id,

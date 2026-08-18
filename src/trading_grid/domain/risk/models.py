@@ -66,6 +66,18 @@ class RiskLimits:
             raise ValueError("max_drawdown_pct must be between 0 and 100")
         if self.max_concurrent_grids < 1:
             raise ValueError("max_concurrent_grids must be >= 1")
+        if not (Decimal("0") < self.max_position_pct <= Decimal("100")):
+            raise ValueError("max_position_pct must be between 0 and 100")
+        if not (Decimal("0") <= self.min_profitable_exit_pct <= Decimal("100")):
+            raise ValueError("min_profitable_exit_pct must be between 0 and 100")
+        if not (Decimal("0") <= self.max_slippage_pct <= Decimal("100")):
+            raise ValueError("max_slippage_pct must be between 0 and 100")
+        if not (Decimal("0") <= self.max_execution_cost_pct <= Decimal("100")):
+            raise ValueError("max_execution_cost_pct must be between 0 and 100")
+        if not (Decimal("0") <= self.min_reserve_pct <= Decimal("100")):
+            raise ValueError("min_reserve_pct must be between 0 and 100")
+        if not (Decimal("0") < self.max_exposure_pct <= Decimal("100")):
+            raise ValueError("max_exposure_pct must be between 0 and 100")
 
 
 @dataclass(frozen=True)
@@ -184,9 +196,10 @@ class PortfolioRisk:
         return (self.total_pnl / self.total_capital) * 100
 
     def update_drawdown(self) -> None:
-        """Update drawdown calculation."""
+        """Update drawdown calculation (clamped to >= 0)."""
         if self.peak_equity > 0:
-            self.drawdown_pct = ((self.peak_equity - self.current_equity) / self.peak_equity) * 100
+            raw_drawdown = ((self.peak_equity - self.current_equity) / self.peak_equity) * 100
+            self.drawdown_pct = max(Decimal("0"), raw_drawdown)
         else:
             self.drawdown_pct = Decimal("0")
 

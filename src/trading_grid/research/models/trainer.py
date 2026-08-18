@@ -232,7 +232,10 @@ class TrainedModel:
             raise ValueError("Model does not support predict_proba")
         proba: npt.NDArray[np.float64] = self.model.predict_proba(X)
         if self.calibrator is not None:
-            proba = self.calibrator.predict(proba)
+            pos_proba = proba[:, 1] if proba.ndim == 2 and proba.shape[1] >= 2 else proba
+            calibrated_pos = self.calibrator.predict(pos_proba)
+            calibrated_pos = np.clip(calibrated_pos, 0.0, 1.0)
+            proba = np.column_stack([1.0 - calibrated_pos, calibrated_pos])
         return proba
 
 
@@ -419,8 +422,14 @@ class ModelTrainer:
             if fold_model.status == ModelStatus.FAILED:
                 continue
 
-            # Evaluate on test
-            metrics = self._calculate_metrics(fold_model.model, X_test, y_test, config.model_type)
+            # [R-M5] Evaluate on test using calibrated estimator when available
+            # Calibrated estimator produces more reliable probability scores
+            eval_estimator = (
+                fold_model.calibrator
+                if fold_model.calibrator is not None
+                else fold_model.model
+            )
+            metrics = self._calculate_metrics(eval_estimator, X_test, y_test, config.model_type)
 
             fold = WalkForwardFold(
                 fold_index=fold_idx,

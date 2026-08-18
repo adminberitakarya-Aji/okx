@@ -136,6 +136,31 @@ class TestSimulatorDeterminism:
         assert result1.total_sell_count == result2.total_sell_count
         assert len(result1.events) == len(result2.events)
 
+    def test_multi_cycle_recycling_is_deterministic(self) -> None:
+        """Multiple price fluctuations must produce deterministic results across runs."""
+        config = make_config()
+        blueprint = make_blueprint()
+        oscillating_prices = [
+            Decimal("100"),
+            Decimal("96"),
+            Decimal("94"),
+            Decimal("98"),
+            Decimal("92"),
+            Decimal("96"),
+            Decimal("99"),
+        ]
+        candles = make_candles_from_closes(oscillating_prices)
+
+        result1 = GridSimulator(config).run(blueprint, candles)
+        result2 = GridSimulator(config).run(blueprint, candles)
+
+        assert result1.total_buy_count == result2.total_buy_count
+        assert result1.total_sell_count == result2.total_sell_count
+        assert result1.completed_cycles == result2.completed_cycles
+        assert result1.realized_pnl == result2.realized_pnl
+        assert result1.final_equity == result2.final_equity
+        assert len(result1.events) == len(result2.events)
+
     def test_result_to_dict_is_serializable(self) -> None:
         """Result to_dict must produce a flat serializable dict."""
         config = make_config()

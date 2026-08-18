@@ -946,9 +946,12 @@ class ExecutionEconomicsExtractor:
         # F-EXE-050/051: Order Size / Liquidity Ratio
         if depth_near_price is not None and depth_near_price > 0:
             if buy_order_size is not None:
+                # If buy_order_size is quote notional, compare directly against depth_near_price
                 os_.buy_order_size_liquidity_ratio = float(buy_order_size / depth_near_price)
-            if sell_order_size is not None and features.microstructure.mid_price:
-                sell_notional = sell_order_size * features.microstructure.mid_price
+            if sell_order_size is not None:
+                # Convert sell base size to quote notional using mid_price if available
+                mid = features.microstructure.mid_price
+                sell_notional = (sell_order_size * mid) if mid is not None else sell_order_size
                 os_.sell_order_size_liquidity_ratio = float(sell_notional / depth_near_price)
 
     def _extract_price_impact(

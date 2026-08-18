@@ -19,6 +19,7 @@ Every order must pass deterministic risk validation BEFORE it reaches any
 exchange. Swapping the exchange adapter must never bypass or reorder this gate.
 """
 
+import asyncio
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -99,7 +100,6 @@ class ExecutionEngine:
         self._tenant_limits = tenant_limits
         self._orders: dict[OrderId, Order] = {}
         self._positions: dict[str, Position] = {}
-        self._fills: list[Fill] = []
 
     @property
     def mode(self) -> ExecutionMode:
@@ -377,27 +377,39 @@ class ExecutionEngine:
                 error_message=f"Execution failed: {e}",
             )
 
-    async def cancel_order(self, order_id: OrderId) -> bool:
+    async def cancel_order(self, order_id: OrderId, user_id: str | None = None) -> bool:
         """
         Cancel an order.
 
         Args:
             order_id: Order to cancel
+            user_id: Optional user identifier for authorization tracking
 
         Returns:
             True if cancellation succeeded
         """
         order = self._orders.get(order_id)
         if order is None:
-            logger.warning("cancel_order_not_found", order_id=order_id)
+            logger.warning("cancel_order_not_found", order_id=order_id, user_id=user_id)
+            return False
+
+        # If user_id is specified and order has user_id metadata, verify ownership
+        order_user_id = order.metadata.get("user_id") if order.metadata else None
+        if user_id is not None and order_user_id is not None and order_user_id != user_id:
+            logger.warning(
+                "cancel_order_unauthorized",
+                order_id=order_id,
+                caller_user_id=user_id,
+                owner_user_id=order_user_id,
+            )
             return False
 
         if order.exchange_order_id is None:
-            logger.warning("cancel_order_no_exchange_id", order_id=order_id)
+            logger.warning("cancel_order_no_exchange_id", order_id=order_id, user_id=user_id)
             return False
 
         if not order.is_active:
-            logger.info("cancel_order_not_active", order_id=order_id, status=order.status)
+            logger.info("cancel_order_not_active", order_id=order_id, status=order.status, user_id=user_id)
             return False
 
         success = await self._adapter.cancel_order(order.market_id, order.exchange_order_id)
@@ -405,7 +417,7 @@ class ExecutionEngine:
         if success:
             order.status = "CANCELLED"
             order.updated_at = datetime.now(UTC)
-            logger.info("order_cancelled", order_id=order_id)
+            logger.info("order_cancelled", order_id=order_id, user_id=user_id)
 
         return success
 
@@ -468,20 +480,23 @@ class ExecutionEngine:
         for pos in exchange_positions:
             self._positions[pos.market_id] = pos
 
-        # Update order states for active orders
-        for order in self.get_active_orders():
-            if order.exchange_order_id:
+        # Update order states for active orders concurrently
+        active_orders = [o for o in self.get_active_orders() if o.exchange_order_id]
+        if active_orders:
+            async def _check_order_status(ord_obj: Order) -> None:
                 try:
                     status_data = await self._adapter.get_order_status(
-                        order.market_id, order.exchange_order_id
+                        ord_obj.market_id, ord_obj.exchange_order_id  # type: ignore[arg-type]
                     )
-                    self._update_order_from_exchange(order, status_data)
+                    self._update_order_from_exchange(ord_obj, status_data)
                 except Exception as e:
                     logger.warning(
                         "order_status_check_failed",
-                        order_id=order.order_id,
+                        order_id=ord_obj.order_id,
                         error=str(e),
                     )
+
+            await asyncio.gather(*[_check_order_status(o) for o in active_orders], return_exceptions=True)
 
         result = {
             "adapter": adapter_result,

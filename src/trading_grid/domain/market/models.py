@@ -10,9 +10,15 @@ This module defines market-related models:
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from decimal import Decimal
+from decimal import ROUND_DOWN, Decimal
 
-from trading_grid.domain.shared.types import MarketId, Price, Quantity, Timestamp
+from trading_grid.domain.shared.types import (
+    MarketId,
+    MarketRegime,
+    Price,
+    Quantity,
+    Timestamp,
+)
 
 
 @dataclass(frozen=True)
@@ -61,9 +67,9 @@ class Market:
         """Round price to tick size."""
         return (price / self.tick_size).quantize(Decimal("1")) * self.tick_size
 
-    def round_quantity(self, quantity: Quantity) -> Quantity:
-        """Round quantity to lot size."""
-        return (quantity / self.lot_size).quantize(Decimal("1")) * self.lot_size
+    def round_quantity(self, quantity: Quantity, rounding: str = ROUND_DOWN) -> Quantity:
+        """Round quantity to lot size (defaults to ROUND_DOWN for safety)."""
+        return (quantity / self.lot_size).quantize(Decimal("1"), rounding=rounding) * self.lot_size
 
     def validate_order(self, price: Price, quantity: Quantity) -> list[str]:
         """
@@ -74,14 +80,20 @@ class Market:
         """
         errors: list[str] = []
 
-        if quantity < self.min_order_size:
+        if quantity <= Decimal("0"):
+            errors.append(f"Quantity {quantity} must be positive")
+        elif quantity < self.min_order_size:
             errors.append(f"Quantity {quantity} below minimum {self.min_order_size}")
         if self.max_order_size and quantity > self.max_order_size:
             errors.append(f"Quantity {quantity} above maximum {self.max_order_size}")
-        if self.min_price and price < self.min_price:
+
+        if price <= Decimal("0"):
+            errors.append(f"Price {price} must be positive")
+        elif self.min_price and price < self.min_price:
             errors.append(f"Price {price} below minimum {self.min_price}")
         if self.max_price and price > self.max_price:
             errors.append(f"Price {price} above maximum {self.max_price}")
+
         if not self.is_active:
             errors.append(f"Market {self.market_id} is not active")
 
@@ -117,6 +129,8 @@ class Candle:
 
     def __post_init__(self) -> None:
         """Validate candle constraints."""
+        if self.open <= 0 or self.high <= 0 or self.low <= 0 or self.close <= 0:
+            raise ValueError("Candle open, high, low, and close prices must be positive")
         if self.high < self.low:
             raise ValueError(f"High ({self.high}) cannot be less than low ({self.low})")
         if self.high < self.open or self.high < self.close:
@@ -293,7 +307,7 @@ class MarketState:
     atr: Decimal | None = None
     liquidity_score: Decimal | None = None
     momentum_score: Decimal | None = None
-    regime: str | None = None
+    regime: MarketRegime | str | None = None
     data_quality: dict[str, bool] = field(default_factory=dict)
 
     @property

@@ -177,7 +177,7 @@ class AuthorizationService:
 
     def __init__(self) -> None:
         """Initialize authorization service."""
-        self._denial_callbacks: list[object] = []
+        pass
 
     def check_permission(
         self,

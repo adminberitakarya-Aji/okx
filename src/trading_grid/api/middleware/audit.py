@@ -12,6 +12,7 @@ Security rules:
 3. State-changing operations create audit records
 """
 
+import time
 from collections.abc import Awaitable, Callable
 from uuid import uuid4
 
@@ -56,8 +57,6 @@ class AuditMiddleware(BaseHTTPMiddleware):
             correlation_id=correlation_id,
             client_ip=request.client.host if request.client else "unknown",
         )
-
-        import time
 
         start_time = time.perf_counter()
 

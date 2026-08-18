@@ -315,6 +315,30 @@ class TestAuditService:
         assert nested["token"] == "[REDACTED]"
         assert nested["safe"] == "value"
 
+    def test_list_of_nested_sensitive_data_filtered(self):
+        """Sensitive keys inside lists of dicts should be recursively redacted."""
+        service = AuditService()
+        record = service.record(
+            actor_id="user",
+            actor_type="HUMAN",
+            action="ACTION",
+            resource="grid",
+            result="SUCCESS",
+            metadata={
+                "integrations": [
+                    {"api_key": "key-123", "exchange": "OKX"},
+                    {"api_secret": "sec-456", "exchange": "BINANCE"},
+                    "plain_string_item",
+                ]
+            },
+        )
+        items = record.metadata["integrations"]
+        assert isinstance(items, list)
+        assert items[0]["api_key"] == "[REDACTED]"
+        assert items[0]["exchange"] == "OKX"
+        assert items[1]["api_secret"] == "[REDACTED]"
+        assert items[2] == "plain_string_item"
+
     def test_sensitive_key_substring_filtered(self):
         """Keys containing sensitive substrings should be redacted."""
         service = AuditService()

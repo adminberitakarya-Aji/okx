@@ -132,9 +132,10 @@ class ApprovalRequest:
 
     def expire(self) -> None:
         """Mark the approval as expired."""
-        if self.is_pending:
+        if self.status in ("PENDING", "APPROVED"):
             self.status = "EXPIRED"
-            self.decided_at = datetime.now(UTC)
+            if self.decided_at is None:
+                self.decided_at = datetime.now(UTC)
 
     def matches_operation(
         self,
@@ -316,16 +317,20 @@ class ApprovalService:
         """
         self._expire_stale_approvals()
         for approval in self._approvals.values():
-            if approval.is_approved and approval.matches_operation(
-                operation_id, environment, market_id, blueprint_id
+            if (
+                approval.is_approved
+                and not approval.is_expired
+                and approval.matches_operation(
+                    operation_id, environment, market_id, blueprint_id
+                )
             ):
                 return True
         return False
 
     def _expire_stale_approvals(self) -> None:
-        """Expire all stale pending approvals."""
+        """Expire all stale approvals (pending or approved whose validity has elapsed)."""
         for approval in self._approvals.values():
-            if approval.is_pending and approval.is_expired:
+            if approval.is_expired and approval.status in ("PENDING", "APPROVED"):
                 approval.expire()
 
 

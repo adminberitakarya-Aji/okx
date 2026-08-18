@@ -41,39 +41,51 @@ logger = structlog.get_logger()
 
 router = APIRouter()
 
-# Service instances (in production, these would be injected via dependency injection)
+# Optional override instances (for testing or explicit dependency injection)
 _demo_service: DemoTradingService | None = None
 _monitoring_service: MonitoringService | None = None
 
 
 def get_demo_service() -> DemoTradingService:
-    """Get demo trading service instance."""
-    if _demo_service is None:
+    """Get demo trading service instance from override or container."""
+    if _demo_service is not None:
+        return _demo_service
+    from trading_grid.api.routes.dependencies import get_default_container
+
+    try:
+        container = get_default_container()
+        return container.demo_service
+    except Exception as exc:
         raise HTTPException(
             status_code=503,
             detail="Demo trading service not initialized",
-        )
-    return _demo_service
+        ) from exc
 
 
 def get_monitoring_service() -> MonitoringService:
-    """Get monitoring service instance."""
-    if _monitoring_service is None:
+    """Get monitoring service instance from override or container."""
+    if _monitoring_service is not None:
+        return _monitoring_service
+    from trading_grid.api.routes.dependencies import get_default_container
+
+    try:
+        container = get_default_container()
+        return container.monitoring_service
+    except Exception as exc:
         raise HTTPException(
             status_code=503,
             detail="Monitoring service not initialized",
-        )
-    return _monitoring_service
+        ) from exc
 
 
 def set_demo_service(service: DemoTradingService) -> None:
-    """Set demo trading service instance (for initialization)."""
+    """Set demo trading service instance (for testing/override)."""
     global _demo_service
     _demo_service = service
 
 
 def set_monitoring_service(service: MonitoringService) -> None:
-    """Set monitoring service instance (for initialization)."""
+    """Set monitoring service instance (for testing/override)."""
     global _monitoring_service
     _monitoring_service = service
 

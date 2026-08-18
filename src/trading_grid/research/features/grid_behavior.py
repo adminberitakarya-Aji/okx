@@ -539,11 +539,19 @@ def _average_interval(events: Sequence[SimulationEvent]) -> float | None:
     return float(sum(intervals) / len(intervals))
 
 
-def _max_burst(events: Sequence[SimulationEvent], burst_window: int = 3) -> int | None:
+def _max_burst(
+    events: Sequence[SimulationEvent],
+    burst_window: int = 3,
+    candle_interval_hours: float = 1.0,
+) -> int | None:
     """
     Maximum number of events within a sliding window of burst_window candles.
 
-    Uses event index proximity as a proxy for time proximity.
+    Args:
+        events: Simulation events to analyse.
+        burst_window: Number of candles per burst window.
+        candle_interval_hours: Duration of each candle in hours. Default 1h.
+            Set to 0.25 for 15-minute candles, 4 for 4-hour candles, etc.
     """
     if not events:
         return 0
@@ -552,11 +560,12 @@ def _max_burst(events: Sequence[SimulationEvent], burst_window: int = 3) -> int 
     if len(timestamps) <= burst_window:
         return len(timestamps)
 
+    burst_seconds = burst_window * candle_interval_hours * 3600
     max_count = 0
     for i in range(len(timestamps)):
         count = 0
         for j in range(i, len(timestamps)):
-            if (timestamps[j] - timestamps[i]).total_seconds() <= burst_window * 3600:
+            if (timestamps[j] - timestamps[i]).total_seconds() <= burst_seconds:
                 count += 1
             else:
                 break

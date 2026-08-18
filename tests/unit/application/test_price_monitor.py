@@ -235,12 +235,22 @@ class TestCrossingDetection:
         )
         assert result == "BUY"
 
-    def test_sell_when_price_lands_exactly_on_level(self):
-        """Price landing exactly on level from below → SELL."""
+    def test_buy_when_previous_price_starts_on_level_and_moves_down(self):
+        """Price starting exactly on level and dropping below → BUY."""
         monitor = make_price_monitor()
         result = monitor._detect_crossing(
-            previous_price=Decimal("49000"),
-            current_price=Decimal("50000"),
+            previous_price=Decimal("50000"),
+            current_price=Decimal("49500"),
+            level_price=Decimal("50000"),
+        )
+        assert result == "BUY"
+
+    def test_sell_when_previous_price_starts_on_level_and_moves_up(self):
+        """Price starting exactly on level and rising above → SELL."""
+        monitor = make_price_monitor()
+        result = monitor._detect_crossing(
+            previous_price=Decimal("50000"),
+            current_price=Decimal("50500"),
             level_price=Decimal("50000"),
         )
         assert result == "SELL"

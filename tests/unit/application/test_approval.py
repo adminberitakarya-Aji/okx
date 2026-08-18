@@ -79,12 +79,12 @@ class TestApprovalRequest:
         assert request.status == "EXPIRED"
         assert request.is_decided
 
-    def test_expire_non_pending_noop(self):
-        """Expiring non-pending should be no-op."""
+    def test_expire_rejected_noop(self):
+        """Expiring already rejected request should be no-op."""
         request = self._create_request()
-        request.approve("admin")
+        request.reject("admin", reason="Too risky")
         request.expire()
-        assert request.status == "APPROVED"
+        assert request.status == "REJECTED"
 
     def test_is_expired_no_expiry(self):
         """No expiry means not expired."""
@@ -343,13 +343,29 @@ class TestApprovalService:
             description="Test",
         )
         service.approve(created.approval_id, "admin")
-        # Simulate expiry after approval - has_valid_approval checks is_approved
-        # but _expire_stale_approvals only expires pending ones
         created.status = "EXPIRED"
         assert not service.has_valid_approval(
             operation_id="op-123",
             environment="LIVE",
         )
+
+    def test_has_valid_approval_timestamp_expired_automatically_invalidates(self):
+        """Approved request with past expires_at timestamp is automatically rejected by has_valid_approval."""
+        service = ApprovalService()
+        created = service.create_approval(
+            operation_id="op-123",
+            operation_type="START_LIVE_GRID",
+            environment="LIVE",
+            requested_by="user",
+            description="Start live trading",
+        )
+        service.approve(created.approval_id, "admin")
+        assert service.has_valid_approval("op-123", "LIVE")
+
+        # Advance time past expires_at
+        created.expires_at = datetime.now(UTC) - timedelta(seconds=1)
+        assert not service.has_valid_approval("op-123", "LIVE")
+        assert created.status == "EXPIRED"
 
     def test_custom_expiry_hours(self):
         """Custom expiry hours should be used."""

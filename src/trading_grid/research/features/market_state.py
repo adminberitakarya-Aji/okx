@@ -587,12 +587,16 @@ class MarketStateFeatureExtractor:
             features.daily_available = True
 
     def _is_weekly_candle_closed(self, candle_time: datetime, observation_time: datetime) -> bool:
-        """Check if weekly candle is closed at observation time."""
+        """Check if weekly candle is closed at observation time.
+
+        Uses full ISO (year, week) tuple comparison to correctly handle
+        year-boundary transitions (e.g. week 52 of year N vs week 1 of year N+1).
+        """
         # ISO week: Monday=0, Sunday=6
         # Weekly candle closes at end of Sunday
-        candle_week = candle_time.isocalendar()[1]
-        obs_week = observation_time.isocalendar()[1]
-        return candle_week < obs_week or candle_time.year < observation_time.year
+        candle_iso = candle_time.isocalendar()
+        obs_iso = observation_time.isocalendar()
+        return (candle_iso.year, candle_iso.week) < (obs_iso.year, obs_iso.week)
 
     def _extract_position_and_proximity(self, features: MarketStateFeatures) -> None:
         """Extract price position and proximity features (F-MKT-041 to F-MKT-049)."""

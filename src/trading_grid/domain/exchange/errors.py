@@ -14,9 +14,20 @@ Key rules:
 
 from typing import Any
 
+from trading_grid.domain.shared.errors import DomainError
 
-class ExchangeError(Exception):
+
+class ExchangeError(DomainError):
     """Base exception for all exchange-related errors."""
+
+    def __init__(self, message: str = "", code: str = "EXCHANGE_ERROR") -> None:
+        # Do NOT call DomainError here directly to avoid overwriting code
+        # in subclasses (e.g. ExchangeAPIError sets self.code before super())
+        Exception.__init__(self, message)
+        if not hasattr(self, "message"):
+            self.message = message
+        if not hasattr(self, "code"):
+            self.code = code
 
 
 class ExchangeAPIError(ExchangeError):

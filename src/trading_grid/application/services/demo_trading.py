@@ -398,10 +398,7 @@ class DemoTradingService:
         """
         session = self._get_session(session_id)
 
-        # STEP 1: IMMEDIATE FIRST ENTRY (before grid starts running)
-        initial_entry_result = await self._execute_initial_entry(session)
-
-        # STEP 2: Start the grid (transition to RUNNING)
+        # STEP 1: Start the grid (transition to RUNNING first for session state atomicity)
         try:
             self._grid_engine.start_grid(session.grid_runtime.grid_id)
         except GridEngineError as e:
@@ -410,6 +407,9 @@ class DemoTradingService:
         session.status = "RUNNING"
         session.started_at = datetime.now(UTC)
         session.metrics.record_state_transition()
+
+        # STEP 2: IMMEDIATE FIRST ENTRY (market BUY at anchor level)
+        initial_entry_result = await self._execute_initial_entry(session)
 
         if initial_entry_result is not None and initial_entry_result.success:
             session.add_note("Demo grid started with initial entry position")
@@ -584,7 +584,7 @@ class DemoTradingService:
         """
         # Try price monitor's cached price first
         if self._price_monitor is not None:
-            cached_price = self._price_monitor._market_last_prices.get(market_id)
+            cached_price = self._price_monitor.get_last_price(market_id)
             if cached_price is not None:
                 return cached_price
 

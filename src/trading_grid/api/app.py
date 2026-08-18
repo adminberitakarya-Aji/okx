@@ -85,7 +85,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.app.name,
         version=settings.app.version,
-        description="OKX AI Trading Grid System - Application Control API",
+        description="AI Trading Grid System — Application Control API (OKX, Binance, Bybit)",
         lifespan=lifespan,
         docs_url="/docs" if settings.app.debug else None,
         redoc_url="/redoc" if settings.app.debug else None,
@@ -95,7 +95,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"] if settings.app.debug else [],
-        allow_credentials=True,
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )

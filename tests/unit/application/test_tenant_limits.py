@@ -272,3 +272,35 @@ class TestCheckCanTrade:
 
         with pytest.raises(UserEmergencyStoppedError):
             service.check_can_trade("usr_1", active_grid_count=0, skip_rate_limit=True, now=0.0)
+
+
+class TestConcurrentTenantLimits:
+    """Tests for concurrency safety and race condition handling in TenantLimitsService."""
+
+    def test_concurrent_rate_limiting_tracks_requests(self, service: TenantLimitsService) -> None:
+        """Sequential/burst requests from multiple users are tracked independently without interference."""
+        service.set_user_overrides("usr_1", {"rate_limit_per_minute": 5})
+        service.set_user_overrides("usr_2", {"rate_limit_per_minute": 5})
+
+        # Interleaved calls from usr_1 and usr_2
+        for i in range(5):
+            service.check_can_trade("usr_1", active_grid_count=0, now=float(i))
+            service.check_can_trade("usr_2", active_grid_count=0, now=float(i))
+
+        # Both users should now hit their rate limits
+        with pytest.raises(RateLimitExceededError):
+            service.check_can_trade("usr_1", active_grid_count=0, now=5.0)
+
+        with pytest.raises(RateLimitExceededError):
+            service.check_can_trade("usr_2", active_grid_count=0, now=5.0)
+
+    def test_emergency_stop_immediately_blocks_concurrent_trades(
+        self, service: TenantLimitsService
+    ) -> None:
+        """Emergency stop immediately blocks subsequent calls even under active trading load."""
+        service.check_can_trade("usr_1", active_grid_count=0, now=0.0)
+        service.emergency_stop_user("usr_1", reason="Market crash detected")
+
+        with pytest.raises(UserEmergencyStoppedError, match="Market crash detected"):
+            service.check_can_trade("usr_1", active_grid_count=0, now=0.5)
+

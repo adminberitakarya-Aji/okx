@@ -32,6 +32,7 @@ logger = structlog.get_logger()
 PUBLIC_PATHS = frozenset(
     {
         "/health",
+        "/ready",
         "/docs",
         "/redoc",
         "/openapi.json",
@@ -83,9 +84,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
         settings = get_settings()
         path = request.url.path
 
-        # Skip authentication for public paths
+        # Skip authentication for public paths (assigned unprivileged anonymous identity)
         if path in PUBLIC_PATHS or path.startswith("/docs") or path.startswith("/redoc"):
-            request.state.identity = self._get_system_identity()
+            request.state.identity = self._get_anonymous_identity()
             response: Response = await call_next(request)
             return response
 
@@ -155,11 +156,52 @@ class AuthMiddleware(BaseHTTPMiddleware):
         """
         Authenticate using Bearer token.
 
-        In production, validate JWT signature and claims.
+        Decodes JWT token, verifies signature and expiry, and constructs Identity.
         """
-        # Placeholder for JWT validation
-        # In production: decode JWT, verify signature, check expiry
-        return None
+        import jwt
+        from trading_grid.config.settings import get_settings
+
+        settings = get_settings()
+        secret_key = settings.app.secret_key.get_secret_value()
+
+        try:
+            payload = jwt.decode(token, secret_key, algorithms=["HS256"])
+            user_id = payload.get("sub") or payload.get("user_id")
+            if not user_id:
+                return None
+
+            role_val = payload.get("role", "VIEWER")
+            if isinstance(role_val, int):
+                role = Role(role_val)
+            elif hasattr(Role, str(role_val)):
+                role = Role[str(role_val)]
+            else:
+                role = Role.VIEWER
+
+            env_raw = payload.get("allowed_environments", ["DEMO"])
+            if isinstance(env_raw, (list, tuple)):
+                allowed_environments = tuple(env_raw)
+            else:
+                allowed_environments = ("DEMO",)
+
+            return Identity(
+                identity_id=str(user_id),
+                identity_type="HUMAN",
+                role=role,
+                allowed_environments=allowed_environments,
+            )
+        except Exception as exc:
+            logger.debug("jwt_auth_failed", error=str(exc))
+            return None
+
+    def _get_anonymous_identity(self) -> Identity:
+        """Get unprivileged identity for public routes."""
+        return Identity(
+            identity_id="anonymous",
+            identity_type="SYSTEM",
+            role=Role.VIEWER,
+            allowed_environments=(),
+        )
 
     def _get_system_identity(self) -> Identity:
         """Get system identity for internal operations."""

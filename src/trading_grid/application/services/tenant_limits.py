@@ -341,6 +341,40 @@ class TenantLimitsService:
     # COMBINED CHECK
     # =========================================================================
 
+    def check_can_place_order(
+        self,
+        user_id: str,
+        *,
+        skip_rate_limit: bool = False,
+        now: float | None = None,
+    ) -> UserRiskLimits:
+        """
+        Check whether an order can be placed for an already running grid.
+
+        Checks:
+        1. Emergency stop status
+        2. Rate limit (unless skipped)
+        (Grid capacity is checked when initiating/starting a grid, not per-order).
+
+        Args:
+            user_id: User identifier
+            skip_rate_limit: Skip rate limit check (for emergency ops)
+            now: Injectable timestamp for testing
+
+        Returns:
+            UserRiskLimits if checks pass
+
+        Raises:
+            UserEmergencyStoppedError: If emergency stopped
+            RateLimitExceededError: If rate limited
+        """
+        self.check_not_emergency_stopped(user_id)
+
+        if not skip_rate_limit:
+            self.check_rate_limit(user_id, now=now)
+
+        return self.get_user_limits(user_id)
+
     def check_can_trade(
         self,
         user_id: str,
@@ -371,10 +405,7 @@ class TenantLimitsService:
             RateLimitExceededError: If rate limited
             MaxGridsExceededError: If grid capacity exceeded
         """
-        self.check_not_emergency_stopped(user_id)
-
-        if not skip_rate_limit:
-            self.check_rate_limit(user_id, now=now)
+        self.check_can_place_order(user_id, skip_rate_limit=skip_rate_limit, now=now)
 
         self.check_grid_capacity(user_id, active_grid_count)
 

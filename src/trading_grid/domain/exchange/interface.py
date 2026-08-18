@@ -84,12 +84,12 @@ class ExchangeAdapter(ABC):
         """Start private WebSocket for order updates."""
 
     @abstractmethod
-    def on_order_update(self, handler: Callable[[dict[str, Any]], None]) -> None:
-        """Register order update handler."""
+    def on_order_update(self, handler: Callable[[dict[str, Any]], Any]) -> None:
+        """Register order update handler (supports sync and async callables)."""
 
     @abstractmethod
-    def on_ticker(self, handler: Callable[[dict[str, Any]], None]) -> None:
-        """Register ticker update handler."""
+    def on_ticker(self, handler: Callable[[dict[str, Any]], Any]) -> None:
+        """Register ticker update handler (supports sync and async callables)."""
 
     # =========================================================================
     # Market data

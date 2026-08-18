@@ -90,6 +90,22 @@ class TestFill:
         assert fill.notional_value == Decimal("5100")
         assert fill.effective_cost == Decimal("5094.9")
 
+    def test_buy_fill_effective_cost_base_currency_fee(self) -> None:
+        """Buy fill with fee in base currency converts fee to quote notional."""
+        fill = Fill(
+            trade_id="trade-003",
+            order_id="ord-003",
+            market_id="BTC-USDT",
+            side="BUY",
+            price=Decimal("50000"),
+            quantity=Decimal("0.1"),
+            fee=Decimal("0.0001"),  # 0.0001 BTC fee
+            fee_currency="BTC",
+        )
+        # Notional: $5,000 + (0.0001 BTC * $50,000 = $5) = $5,005
+        assert fill.notional_value == Decimal("5000")
+        assert fill.effective_cost == Decimal("5005")
+
 
 class TestPosition:
     """Tests for Position."""

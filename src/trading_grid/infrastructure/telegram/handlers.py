@@ -431,26 +431,48 @@ async def cmd_account(message: Message) -> None:
 
 
 async def cmd_stop_all(message: Message) -> None:
-    """Handle /stop_all command (emergency stop all grids)."""
+    """Handle /stop_all command (emergency stop all grids across all exchanges)."""
     if not await check_authorization(message):
         return
 
-    container = get_service_container()
-    if container is None:
+    multi = get_multi_container()
+    default_container = get_service_container()
+
+    if multi is None and default_container is None:
         await message.answer("⚠️ Service container not initialized.")
         return
 
     user_id = message.from_user.id if message.from_user else None
+    reason = f"Emergency stop by Telegram user {user_id}"
     logger.warning("emergency_stop_requested", user_id=user_id)
 
-    stopped = container.demo_service.emergency_stop_all(
-        reason=f"Emergency stop by Telegram user {user_id}"
-    )
+    all_stopped: list[object] = []
+    exchange_counts: dict[str, int] = {}
 
-    if stopped:
-        grid_list = "\n".join(f"• <code>{s.grid_runtime.grid_id}</code>" for s in stopped)
+    containers_to_stop: list[tuple[str, ServiceContainer]] = []
+    if multi is not None and getattr(multi, "_containers", None):
+        containers_to_stop.extend(multi._containers.items())
+    elif default_container is not None:
+        exchange_name = getattr(default_container, "exchange_id", "OKX")
+        containers_to_stop.append((exchange_name, default_container))
+
+    for exchange_id, container in containers_to_stop:
+        try:
+            stopped = container.demo_service.emergency_stop_all(reason=reason)
+            if stopped:
+                all_stopped.extend(stopped)
+                exchange_counts[exchange_id] = len(stopped)
+        except Exception as e:
+            logger.error("emergency_stop_exchange_failed", exchange=exchange_id, error=str(e))
+
+    if all_stopped:
+        exchange_summary = ", ".join(
+            f"{ex}: {cnt}" for ex, cnt in exchange_counts.items() if cnt > 0
+        )
         await message.answer(
-            f"🚨 <b>Emergency Stop Executed</b>\n\nStopped {len(stopped)} grid(s):\n{grid_list}"
+            f"🚨 <b>Emergency Stop Executed</b>\n\n"
+            f"Stopped <b>{len(all_stopped)}</b> grid(s) across exchanges.\n"
+            f"{exchange_summary}"
         )
     else:
         await message.answer("🚨 <b>Emergency Stop</b>\n\nNo active grids to stop.")
@@ -537,13 +559,23 @@ async def cmd_connect(message: Message) -> None:
     parts = (message.text or "").split()
     if len(parts) < 5:
         await message.answer(
-            "📋 <b>Usage:</b>\n"
+            "🔐 <b>Exchange Credential Setup</b>\n\n"
+            "🛡️ <i>Recommended (Most Secure):</i>\n"
+            "Use <code>/pair</code> to generate a one-time pairing token and configure API credentials "
+            "securely via the Web UI dashboard without sharing secrets in chat.\n\n"
+            "📋 <b>Usage (Direct Chat Setup):</b>\n"
             "<code>/connect OKX DEMO api_key api_secret passphrase</code>\n"
             "<code>/connect BINANCE DEMO api_key api_secret</code>\n"
             "<code>/connect BYBIT DEMO api_key api_secret</code>\n\n"
-            "⚠️ Your message will be deleted immediately after processing."
+            "⚠️ <i>Withdraw permission MUST remain DISABLED on all API keys. Your message will be deleted immediately.</i>"
         )
         return
+
+    # SECURITY: Delete the user's credential message immediately before validation
+    try:
+        await message.delete()
+    except Exception:
+        logger.warning("failed_to_delete_credential_message", user_id=message.from_user.id)
 
     exchange = parts[1].upper()
     environment = parts[2].upper()
@@ -558,12 +590,6 @@ async def cmd_connect(message: Message) -> None:
     if environment not in ("DEMO", "LIVE"):
         await message.answer("❌ Invalid environment. Use DEMO or LIVE.")
         return
-
-    # SECURITY: Delete the user's credential message immediately
-    try:
-        await message.delete()
-    except Exception:
-        logger.warning("failed_to_delete_credential_message", user_id=message.from_user.id)
 
     # Store encrypted credential
     actor = f"telegram:{message.from_user.id}"
@@ -1428,6 +1454,428 @@ async def callback_unlink_confirm(callback: CallbackQuery) -> None:
         await callback.answer()
 
 
+async def callback_research_top10(callback: CallbackQuery) -> None:
+    """Handle research:top10 — alias for menu:top10."""
+    await callback_menu_top10(callback)
+
+
+async def callback_research_markets(callback: CallbackQuery) -> None:
+    """Handle research:markets — show all ranked markets."""
+    if not await check_callback_authorization(callback):
+        return
+
+    container = get_service_container()
+    market_ids: list[str] | None = None
+
+    if container is not None:
+        try:
+            result = await container.research_service.rank_markets(top_n=50)
+            if result.recommendations:
+                market_ids = [r.market_id for r in result.recommendations]
+        except Exception as e:
+            logger.error("research_markets_failed", error=str(e))
+
+    msg = _get_editable_message(callback)
+    if msg is not None:
+        await msg.edit_text(
+            format_top10_list(rankings=None),
+            reply_markup=top10_menu_keyboard(market_ids=market_ids),
+        )
+    await callback.answer()
+
+
+async def callback_research_refresh(callback: CallbackQuery) -> None:
+    """Handle research:refresh — trigger a fresh market ranking."""
+    if not await check_callback_authorization(callback):
+        return
+
+    container = get_service_container()
+    if container is not None:
+        try:
+            await container.research_service.rank_markets(top_n=10)
+        except Exception as e:
+            logger.error("research_refresh_failed", error=str(e))
+            await callback.answer("⚠️ Refresh failed")
+            return
+
+    await callback.answer("✅ Research refreshed")
+    await callback_menu_research(callback)
+
+
+async def callback_market_detail(callback: CallbackQuery) -> None:
+    """Handle market:<market_id> — show market detail with blueprint/simulate actions."""
+    if not await check_callback_authorization(callback):
+        return
+
+    market_id = (callback.data or "").removeprefix("market:")
+    msg = _get_editable_message(callback)
+    if msg is not None:
+        await msg.edit_text(
+            f"📊 <b>Market: {market_id}</b>\n\nSelect an action:",
+            reply_markup=top10_menu_keyboard(market_ids=[market_id]),
+        )
+    await callback.answer()
+
+
+async def callback_blueprint_view(callback: CallbackQuery) -> None:
+    """Handle blueprint:view:<market_id> — generate and show blueprint for a market."""
+    if not await check_callback_authorization(callback):
+        return
+
+    parts = (callback.data or "").split(":", 2)
+    market_id = parts[2] if len(parts) > 2 else ""
+    container = get_service_container()
+    msg = _get_editable_message(callback)
+
+    if container is None or msg is None:
+        await callback.answer()
+        return
+
+    try:
+        blueprint = await container.research_service.generate_blueprint(market_id=market_id)
+        text = (
+            f"🧠 <b>Blueprint Generated</b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"<b>Market:</b> {blueprint.market_id}\n"
+            f"<b>Sections:</b> {blueprint.section_count}\n"
+            f"<b>Levels:</b> {blueprint.total_grid_count}\n"
+            f"<b>Capital:</b> {blueprint.total_capital:.2f} USDT\n\n"
+            f"Use BLUEPRINT menu to view details and start trading."
+        )
+        await msg.edit_text(text, reply_markup=blueprint_menu_keyboard())
+    except Exception as e:
+        logger.error("blueprint_view_failed", market_id=market_id, error=str(e))
+        await callback.answer(f"⚠️ Blueprint failed: {e}")
+        return
+
+    await callback.answer("✅ Blueprint generated")
+
+
+async def callback_blueprint_refresh(callback: CallbackQuery) -> None:
+    """Handle blueprint:refresh — alias for menu:blueprint."""
+    await callback_menu_blueprint(callback)
+
+
+async def callback_grid_orders_all(callback: CallbackQuery) -> None:
+    """Handle grid:orders — show all recent orders across active grids."""
+    if not await check_callback_authorization(callback):
+        return
+
+    container = get_service_container()
+    msg = _get_editable_message(callback)
+
+    if container is None or msg is None:
+        await callback.answer()
+        return
+
+    sessions = container.demo_service.active_sessions
+    lines = ["📋 <b>RECENT ORDERS</b>", "━━━━━━━━━━━━━━━━━━", ""]
+
+    if not sessions:
+        lines.append("No active grids.")
+    else:
+        for session in sessions[:5]:
+            grid_id = session.grid_runtime.grid_id
+            orders = session.grid_runtime.order_history[-5:] if session.grid_runtime.order_history else []
+            lines.append(f"<b>Grid {grid_id}:</b>")
+            if orders:
+                for order in orders:
+                    lines.append(f"  • {order.side} {order.quantity} @ {order.price} [{order.status}]")
+            else:
+                lines.append("  No orders yet.")
+            lines.append("")
+
+    await msg.edit_text("\n".join(lines), reply_markup=grid_menu_keyboard())
+    await callback.answer()
+
+
+async def callback_grid_pnl_all(callback: CallbackQuery) -> None:
+    """Handle grid:pnl — show P&L summary across all active grids."""
+    if not await check_callback_authorization(callback):
+        return
+
+    container = get_service_container()
+    msg = _get_editable_message(callback)
+
+    if container is None or msg is None:
+        await callback.answer()
+        return
+
+    sessions = container.demo_service.active_sessions
+    lines = ["📊 <b>P&L SUMMARY</b>", "━━━━━━━━━━━━━━━━━━", ""]
+
+    if not sessions:
+        lines.append("No active grids.")
+    else:
+        total_pnl = sum(
+            (s.grid_runtime.realized_pnl for s in sessions if s.grid_runtime.realized_pnl is not None),
+            start=0,
+        )
+        for session in sessions:
+            pnl = session.grid_runtime.realized_pnl or 0
+            emoji = "🟢" if pnl >= 0 else "🔴"
+            lines.append(f"{emoji} <b>{session.grid_runtime.grid_id}</b>: {pnl:+.4f} USDT")
+        lines.append("")
+        lines.append(f"<b>Total:</b> {total_pnl:+.4f} USDT")
+
+    await msg.edit_text("\n".join(lines), reply_markup=grid_menu_keyboard())
+    await callback.answer()
+
+
+async def callback_grid_risk(callback: CallbackQuery) -> None:
+    """Handle grid:risk — show risk status for all active grids."""
+    if not await check_callback_authorization(callback):
+        return
+
+    container = get_service_container()
+    msg = _get_editable_message(callback)
+
+    if container is None or msg is None:
+        await callback.answer()
+        return
+
+    lines = ["🛡 <b>RISK STATUS</b>", "━━━━━━━━━━━━━━━━━━", ""]
+    try:
+        risk_status = container.risk_service.get_current_risk_summary()
+        for key, val in risk_status.items():
+            lines.append(f"<b>{key}:</b> {val}")
+    except Exception:
+        lines.append("Risk status unavailable.")
+
+    await msg.edit_text("\n".join(lines), reply_markup=grid_menu_keyboard())
+    await callback.answer()
+
+
+async def callback_grid_orders_detail(callback: CallbackQuery) -> None:
+    """Handle grid:orders:<grid_id> — show orders for a specific grid."""
+    if not await check_callback_authorization(callback):
+        return
+
+    parts = (callback.data or "").split(":", 2)
+    grid_id = parts[2] if len(parts) > 2 else ""
+    container = get_service_container()
+    msg = _get_editable_message(callback)
+
+    if container is None or msg is None:
+        await callback.answer()
+        return
+
+    session = next(
+        (s for s in container.demo_service.active_sessions
+         if s.grid_runtime.grid_id == grid_id),
+        None,
+    )
+
+    if session is None:
+        await callback.answer("Grid not found")
+        return
+
+    orders = session.grid_runtime.order_history[-10:] if session.grid_runtime.order_history else []
+    lines = [f"📋 <b>Orders — {grid_id}</b>", "━━━━━━━━━━━━━━━━━━", ""]
+    if orders:
+        for order in orders:
+            lines.append(f"• {order.side} {order.quantity} @ {order.price} [{order.status}]")
+    else:
+        lines.append("No orders yet.")
+
+    await msg.edit_text("\n".join(lines), reply_markup=grid_detail_keyboard(grid_id=grid_id))
+    await callback.answer()
+
+
+async def callback_grid_pnl_detail(callback: CallbackQuery) -> None:
+    """Handle grid:pnl:<grid_id> — show P&L for a specific grid."""
+    if not await check_callback_authorization(callback):
+        return
+
+    parts = (callback.data or "").split(":", 2)
+    grid_id = parts[2] if len(parts) > 2 else ""
+    container = get_service_container()
+    msg = _get_editable_message(callback)
+
+    if container is None or msg is None:
+        await callback.answer()
+        return
+
+    session = next(
+        (s for s in container.demo_service.active_sessions
+         if s.grid_runtime.grid_id == grid_id),
+        None,
+    )
+
+    if session is None:
+        await callback.answer("Grid not found")
+        return
+
+    pnl = session.grid_runtime.realized_pnl or 0
+    emoji = "🟢" if pnl >= 0 else "🔴"
+    text = (
+        f"📊 <b>P&L — {grid_id}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"Realized P&L: {emoji} <b>{pnl:+.4f} USDT</b>\n"
+        f"Market: {session.grid_runtime.market_id}\n"
+        f"Cycles completed: {session.grid_runtime.completed_cycles}"
+    )
+    await msg.edit_text(text, reply_markup=grid_detail_keyboard(grid_id=grid_id))
+    await callback.answer()
+
+
+async def callback_account_balance(callback: CallbackQuery) -> None:
+    """Handle account:balance — fetch and display account balance."""
+    if not await check_callback_authorization(callback):
+        return
+
+    container = get_service_container()
+    msg = _get_editable_message(callback)
+
+    if container is None or msg is None:
+        await callback.answer()
+        return
+
+    try:
+        balance = await container.adapter.get_balance()
+        lines = ["💰 <b>ACCOUNT BALANCE</b>", "━━━━━━━━━━━━━━━━━━", ""]
+        for asset, amounts in balance.items():
+            total = amounts.get("total", 0)
+            available = amounts.get("available", 0)
+            if float(total) > 0:
+                lines.append(f"<b>{asset}:</b> {total:.4f} (avail: {available:.4f})")
+        if len(lines) == 3:
+            lines.append("No balance data.")
+        await msg.edit_text("\n".join(lines), reply_markup=account_menu_keyboard())
+    except Exception as e:
+        logger.error("account_balance_failed", error=str(e))
+        await callback.answer("⚠️ Failed to fetch balance")
+        return
+
+    await callback.answer()
+
+
+async def callback_account_pnl(callback: CallbackQuery) -> None:
+    """Handle account:pnl — show total P&L summary across all grids."""
+    if not await check_callback_authorization(callback):
+        return
+
+    container = get_service_container()
+    msg = _get_editable_message(callback)
+
+    if container is None or msg is None:
+        await callback.answer()
+        return
+
+    sessions = container.demo_service.active_sessions
+    total_pnl = sum(
+        (s.grid_runtime.realized_pnl or 0 for s in sessions),
+        start=0,
+    )
+    emoji = "🟢" if total_pnl >= 0 else "🔴"
+    text = (
+        f"📊 <b>ACCOUNT P&L</b>\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"Total Realized P&L: {emoji} <b>{total_pnl:+.4f} USDT</b>\n"
+        f"Active Grids: {len(sessions)}"
+    )
+    await msg.edit_text(text, reply_markup=account_menu_keyboard())
+    await callback.answer()
+
+
+async def callback_account_risk(callback: CallbackQuery) -> None:
+    """Handle account:risk — show account risk limits."""
+    if not await check_callback_authorization(callback):
+        return
+
+    container = get_service_container()
+    msg = _get_editable_message(callback)
+
+    if container is None or msg is None:
+        await callback.answer()
+        return
+
+    try:
+        limits = container.risk_service.get_limits()
+        lines = ["🛡 <b>RISK LIMITS</b>", "━━━━━━━━━━━━━━━━━━", ""]
+        lines.append(f"Max Active Grids: {limits.max_active_grids}")
+        lines.append(f"Max Capital/Grid: {limits.max_capital_per_grid} USDT")
+        lines.append(f"Max Total Exposure: {limits.max_total_exposure} USDT")
+        lines.append(f"Max Daily Loss: {limits.max_daily_loss_pct}%")
+        await msg.edit_text("\n".join(lines), reply_markup=account_menu_keyboard())
+    except Exception as e:
+        logger.error("account_risk_failed", error=str(e))
+        await msg.edit_text(
+            "🛡 <b>RISK LIMITS</b>\n━━━━━━━━━━━━━━━━━━\n\nRisk limits unavailable.",
+            reply_markup=account_menu_keyboard(),
+        )
+
+    await callback.answer()
+
+
+async def callback_account_okx(callback: CallbackQuery) -> None:
+    """Handle account:okx — show OKX connection status."""
+    if not await check_callback_authorization(callback):
+        return
+
+    msg = _get_editable_message(callback)
+    if msg is None:
+        await callback.answer()
+        return
+
+    user = await _user_service.get_user_by_telegram(callback.from_user.id)
+    okx = await _user_service.get_okx_integration(user.user_id) if user else None
+    connected = okx is not None
+    verified = okx.status == "VERIFIED" if okx else False
+    environment = okx.environment if okx else "DEMO"
+
+    status_emoji = "🟢" if verified else ("🟡" if connected else "🔴")
+    text = (
+        f"🔗 <b>OKX CONNECTION</b>\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"Status: {status_emoji} {'Verified' if verified else ('Connected' if connected else 'Not connected')}\n"
+        f"Environment: {environment}\n\n"
+        f"Use /connect to link your OKX API credentials."
+    )
+    await msg.edit_text(text, reply_markup=account_menu_keyboard())
+    await callback.answer()
+
+
+async def callback_settings_notifications(callback: CallbackQuery) -> None:
+    """Handle settings:notifications — placeholder (not yet configurable via Telegram)."""
+    if not await check_callback_authorization(callback):
+        return
+
+    msg = _get_editable_message(callback)
+    if msg is not None:
+        await msg.edit_text(
+            "🔔 <b>NOTIFICATIONS</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            "Notification settings are managed via the web dashboard.\n\n"
+            "Currently, all grid events (fills, stops, alerts) are sent to this chat.",
+            reply_markup=settings_menu_keyboard(),
+        )
+    await callback.answer()
+
+
+async def callback_settings_environment(callback: CallbackQuery) -> None:
+    """Handle settings:environment — show current trading environment."""
+    if not await check_callback_authorization(callback):
+        return
+
+    user = await _user_service.get_user_by_telegram(callback.from_user.id)
+    okx = await _user_service.get_okx_integration(user.user_id) if user else None
+    environment = okx.environment if okx else "DEMO"
+
+    msg = _get_editable_message(callback)
+    if msg is not None:
+        env_emoji = "🧪" if environment == "DEMO" else "🚀"
+        await msg.edit_text(
+            f"🌐 <b>ENVIRONMENT</b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"Current: {env_emoji} <b>{environment}</b>\n\n"
+            f"To switch environments, update your API credentials via /connect\n"
+            f"and set OKX_DEMO_MODE in your configuration.",
+            reply_markup=settings_menu_keyboard(),
+        )
+    await callback.answer()
+
+
 async def callback_noop(callback: CallbackQuery) -> None:
     """Handle no-operation callbacks (disabled buttons)."""
     await callback.answer()
@@ -1475,8 +1923,16 @@ def register_handlers(
     dp.callback_query.register(callback_menu_account, F.data == "menu:account")
     dp.callback_query.register(callback_menu_settings, F.data == "menu:settings")
 
+    # Callback handlers - Research sub-actions
+    dp.callback_query.register(callback_research_top10, F.data == "research:top10")
+    dp.callback_query.register(callback_research_markets, F.data == "research:markets")
+    dp.callback_query.register(callback_research_refresh, F.data == "research:refresh")
+    dp.callback_query.register(callback_market_detail, F.data.startswith("market:"))
+
     # Callback handlers - Blueprint
     dp.callback_query.register(callback_blueprint_detail, F.data.startswith("blueprint:detail:"))
+    dp.callback_query.register(callback_blueprint_view, F.data.startswith("blueprint:view:"))
+    dp.callback_query.register(callback_blueprint_refresh, F.data == "blueprint:refresh")
     dp.callback_query.register(callback_grid_start, F.data.startswith("grid:start:"))
 
     # Callback handlers - Simulation
@@ -1489,7 +1945,23 @@ def register_handlers(
     dp.callback_query.register(callback_grid_resume, F.data.startswith("grid:resume:"))
     dp.callback_query.register(callback_grid_stop, F.data.startswith("grid:stop:"))
 
+    # Callback handlers - Grid aggregate views
+    # NOTE: Order matters — specific patterns before generic ones
+    dp.callback_query.register(callback_grid_orders_detail, F.data.startswith("grid:orders:"))
+    dp.callback_query.register(callback_grid_pnl_detail, F.data.startswith("grid:pnl:"))
+    dp.callback_query.register(callback_grid_orders_all, F.data == "grid:orders")
+    dp.callback_query.register(callback_grid_pnl_all, F.data == "grid:pnl")
+    dp.callback_query.register(callback_grid_risk, F.data == "grid:risk")
+
+    # Callback handlers - Account
+    dp.callback_query.register(callback_account_balance, F.data == "account:balance")
+    dp.callback_query.register(callback_account_pnl, F.data == "account:pnl")
+    dp.callback_query.register(callback_account_risk, F.data == "account:risk")
+    dp.callback_query.register(callback_account_okx, F.data == "account:okx")
+
     # Callback handlers - Settings
+    dp.callback_query.register(callback_settings_notifications, F.data == "settings:notifications")
+    dp.callback_query.register(callback_settings_environment, F.data == "settings:environment")
     dp.callback_query.register(callback_settings_unlink, F.data == "settings:unlink")
     dp.callback_query.register(callback_unlink_confirm, F.data == "unlink:confirm")
 

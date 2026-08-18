@@ -275,6 +275,16 @@ class ResearchBlueprintGenerator:
 
         # Available range for actual sections (excluding gaps)
         total_range = upper_price - lower_price
+
+        # [R-M7] Guard: total gaps must be strictly less than the total range,
+        # otherwise each section_range would be zero or negative (inverted bounds).
+        if section_count > 1 and total_gaps >= total_range:
+            raise ValueError(
+                f"section_gap_pct={self.config.section_gap_pct} with "
+                f"section_count={section_count} produces total_gaps={total_gaps} "
+                f">= total_range={total_range}. Reduce section_gap_pct or section_count."
+            )
+
         available_range = total_range - total_gaps
 
         # Each section gets equal portion of available range
@@ -333,8 +343,13 @@ class SimulationLabelPipeline:
         self.storage = storage
         self.config = config or SimulationLabelPipelineConfig()
         self.blueprint_generator = ResearchBlueprintGenerator(self.config.blueprint_config)
+        # [R-M6] Snapshot ID is computed once at pipeline construction time to
+        # ensure all labels generated in a single pipeline run share the same
+        # snapshot identifier, even if the pipeline spans a month boundary.
+        _snapshot_ts = datetime.now(UTC)
+        _snapshot_id = f"universe-{_snapshot_ts.strftime('%Y%m')}"
         self.label_generator = LabelGenerator(
-            universe_snapshot_id=f"universe-{datetime.now(UTC).strftime('%Y%m')}",
+            universe_snapshot_id=_snapshot_id,
             label_version=self.config.label_version,
         )
 

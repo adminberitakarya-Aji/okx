@@ -4,6 +4,11 @@ Grid API routes.
 Endpoints for grid runtime control (start, pause, resume, stop, emergency-stop).
 
 Authorization: LEVEL 2+ (Demo Grid Control), LEVEL 3+ (Live Grid Control)
+
+.. note::
+    TODO [I-L3]: Grid control routes currently hardcode ``get_default_container()``
+    (OKX only). Multi-exchange support requires an ``exchange`` query parameter
+    and per-exchange container dispatch.
 """
 
 from datetime import UTC, datetime

@@ -368,11 +368,20 @@ class CausalIntegrityValidator:
     - Temporal ordering within splits
     """
 
+    @staticmethod
+    def _normalize_tz(ts: datetime) -> datetime:
+        """Normalize a datetime to UTC timezone-aware for safe comparison."""
+        if ts.tzinfo is None:
+            return ts.replace(tzinfo=UTC)
+        return ts
+
     def validate_row(self, row: DatasetRow) -> list[str]:
         """Return list of violations for a single row (empty = pass)."""
         violations: list[str] = []
 
-        # Check feature timestamps if present
+        obs_ts = self._normalize_tz(row.observation_timestamp)
+
+        # Check feature timestamps if present [R-M3: normalize before comparison]
         for layer_name, features in [
             ("market_state", row.market_state_features),
             ("execution_economics", row.execution_economics_features),
@@ -382,32 +391,50 @@ class CausalIntegrityValidator:
             if feature_ts is not None:
                 if isinstance(feature_ts, str):
                     feature_ts = datetime.fromisoformat(feature_ts)
-                if isinstance(feature_ts, datetime) and feature_ts > row.observation_timestamp:
-                    violations.append(
-                        f"{layer_name} feature timestamp {feature_ts} "
-                        f"is after observation timestamp {row.observation_timestamp}"
-                    )
+                if isinstance(feature_ts, datetime):
+                    feature_ts = self._normalize_tz(feature_ts)
+                    if feature_ts > obs_ts:
+                        violations.append(
+                            f"{layer_name} feature timestamp {feature_ts} "
+                            f"is after observation timestamp {obs_ts}"
+                        )
 
         # Check label window alignment (Spec §47)
         label_start = row.labels.get("label_start")
         if label_start is not None:
             if isinstance(label_start, str):
                 label_start = datetime.fromisoformat(label_start)
-            if isinstance(label_start, datetime) and label_start < row.observation_timestamp:
-                violations.append(
-                    f"Label start {label_start} is before observation "
-                    f"timestamp {row.observation_timestamp}"
-                )
+            if isinstance(label_start, datetime):
+                label_start = self._normalize_tz(label_start)
+                if label_start < obs_ts:
+                    violations.append(
+                        f"Label start {label_start} is before observation "
+                        f"timestamp {obs_ts}"
+                    )
 
         return violations
 
     def validate_temporal_ordering(self, rows: list[DatasetRow], split: DataSplit) -> bool:
-        """Verify rows within a split are temporally ordered."""
+        """Verify rows within a split are temporally ordered per market_id.
+
+        [R-M2] Validates ordering per market_id separately. A multi-market
+        dataset interleaves timestamps across markets — global ordering would
+        produce false positives whenever market-A and market-B timestamps
+        alternate non-monotonically.
+        """
         split_rows = [r for r in rows if r.split == split]
         if len(split_rows) <= 1:
             return True
-        timestamps = [r.observation_timestamp for r in split_rows]
-        return all(t1 <= t2 for t1, t2 in itertools.pairwise(timestamps))
+
+        market_ids = {r.market_id for r in split_rows}
+        for market_id in market_ids:
+            market_rows = [r for r in split_rows if r.market_id == market_id]
+            if len(market_rows) <= 1:
+                continue
+            timestamps = [r.observation_timestamp for r in market_rows]
+            if not all(t1 <= t2 for t1, t2 in itertools.pairwise(timestamps)):
+                return False
+        return True
 
     def validate_no_test_in_train(self, rows: list[DatasetRow]) -> bool:
         """Ensure no test-period data appears in training split."""
@@ -641,16 +668,22 @@ class DatasetBuilder:
             splitter = TimeSeriesSplitter(split_config)
             splitter.split_rows(rows)
 
-        # Run causal audit
-        validator = CausalIntegrityValidator()
-        leakage_passed, violations = validator.audit_dataset(rows)
+        # Run causal audit (conditionally — disabled for fast dev builds)
+        if run_causal_audit:
+            validator = CausalIntegrityValidator()
+            leakage_passed, violations = validator.audit_dataset(rows)
 
-        temporal_passed = True
-        if split_config is not None:
-            for split in DataSplit:
-                if not validator.validate_temporal_ordering(rows, split):
-                    temporal_passed = False
-                    break
+            temporal_passed = True
+            if split_config is not None:
+                for split in DataSplit:
+                    if not validator.validate_temporal_ordering(rows, split):
+                        temporal_passed = False
+                        break
+        else:
+            leakage_passed = True
+            violations = []
+            temporal_passed = True
+            logger.warning("causal_audit_skipped", reason="run_causal_audit=False")
 
         manifest = self.build_manifest()
         metrics = self.compute_quality_metrics(

@@ -20,6 +20,7 @@ from trading_grid.config.settings import (
     BybitSettings,
     OKXSettings,
     Settings,
+    TelegramSettings,
 )
 
 
@@ -65,7 +66,8 @@ def make_settings(
         if bybit_configured
         else BybitSettings(testnet_mode=bybit_testnet, _env_file=None)
     )
-    return Settings(app=app, okx=okx, binance=binance, bybit=bybit, _env_file=None)
+    telegram = TelegramSettings(open_access=False, _env_file=None)
+    return Settings(app=app, okx=okx, binance=binance, bybit=bybit, telegram=telegram, _env_file=None)
 
 
 class TestExchangeSecurityValidator:
@@ -262,3 +264,21 @@ class TestEffectiveUrls:
         settings = BybitSettings(api_key="k", api_secret="s", testnet_mode=False, _env_file=None)
         assert "testnet" not in settings.effective_base_url
         assert "testnet" not in settings.effective_ws_url
+
+
+class TestTelegramOpenAccessProductionValidator:
+    """Verify that open_access is rejected in production."""
+
+    def test_open_access_in_production_raises(self) -> None:
+        """TELEGRAM_OPEN_ACCESS=True in production raises ValueError."""
+        app = AppSettings(env="production", _env_file=None)
+        telegram = TelegramSettings(open_access=True, _env_file=None)
+        with pytest.raises(ValueError, match="TELEGRAM_OPEN_ACCESS cannot be True in production"):
+            Settings(app=app, telegram=telegram, _env_file=None)
+
+    def test_open_access_in_development_allowed(self) -> None:
+        """TELEGRAM_OPEN_ACCESS=True in development is allowed for beta trial."""
+        app = AppSettings(env="development", _env_file=None)
+        telegram = TelegramSettings(open_access=True, _env_file=None)
+        settings = Settings(app=app, telegram=telegram, _env_file=None)
+        assert settings.telegram.open_access is True

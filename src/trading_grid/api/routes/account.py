@@ -26,6 +26,10 @@ async def get_account() -> AccountResponse:
     Get account status.
 
     Returns account summary including equity and balances.
+
+    .. note::
+        TODO [I-L2]: Currently returns hardcoded zero balances.
+        Full implementation should fetch live data from the exchange adapter.
     """
     container = get_default_container()
     settings = container._settings

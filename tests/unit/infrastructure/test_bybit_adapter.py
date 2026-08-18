@@ -74,12 +74,14 @@ class TestBybitAdapterWebSocket:
     async def test_start_market_data_ws(self):
         adapter = _make_adapter()
         with patch("trading_grid.infrastructure.bybit.adapter.BybitWebSocketClient") as mock_ws:
+            mock_ws.return_value.connect = AsyncMock()
             await adapter.start_market_data_ws()
             mock_ws.assert_called_once()
 
     async def test_start_private_ws(self):
         adapter = _make_adapter()
         with patch("trading_grid.infrastructure.bybit.adapter.BybitWebSocketClient") as mock_ws:
+            mock_ws.return_value.connect = AsyncMock()
             await adapter.start_private_ws()
             mock_ws.assert_called_once()
 

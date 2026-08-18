@@ -127,7 +127,7 @@ class TestRequestInternals:
             assert call_kwargs["headers"]["X-MBX-APIKEY"] == "test-key"
 
     async def test_request_api_error_with_json_body(self):
-        """Binance returns error JSON with code/msg on 4xx."""
+        """Binance returns error JSON with code/msg on 4xx (fail fast without retrying)."""
         client = _make_client()
         error_body = {"code": -1121, "msg": "Invalid symbol."}
         mock_resp = _mock_response(error_body, status_code=400)
@@ -137,16 +137,14 @@ class TestRequestInternals:
             mock_http.request.return_value = mock_resp
             mock_ensure.return_value = mock_http
 
-            with pytest.raises(tenacity.RetryError) as exc_info:
+            with pytest.raises(BinanceAPIError) as exc_info:
                 await client._request("GET", "/api/v3/ticker/24hr", params={"symbol": "INVALID"})
 
-            last_exc = exc_info.value.last_attempt.exception()
-            assert isinstance(last_exc, BinanceAPIError)
-            assert last_exc.code == "-1121"
-            assert "Invalid symbol" in last_exc.message
+            assert exc_info.value.code == "-1121"
+            assert "Invalid symbol" in exc_info.value.message
 
     async def test_request_api_error_non_json_body(self):
-        """Non-JSON error body falls back to status code + text."""
+        """Non-JSON error body falls back to status code + text (raises BinanceAPIError directly)."""
         client = _make_client()
         mock_resp = MagicMock(spec=httpx.Response)
         mock_resp.status_code = 502
@@ -158,12 +156,11 @@ class TestRequestInternals:
             mock_http.request.return_value = mock_resp
             mock_ensure.return_value = mock_http
 
-            with pytest.raises(tenacity.RetryError) as exc_info:
+            with pytest.raises(BinanceAPIError) as exc_info:
                 await client._request("GET", "/api/v3/exchangeInfo")
 
-            last_exc = exc_info.value.last_attempt.exception()
-            assert isinstance(last_exc, BinanceAPIError)
-            assert last_exc.code == "502"
+            assert exc_info.value.code == "502"
+            assert "Bad Gateway" in exc_info.value.message
 
     async def test_request_returns_json(self):
         client = _make_client()

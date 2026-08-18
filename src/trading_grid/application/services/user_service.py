@@ -479,14 +479,15 @@ class UserService:
             existing_identity = existing.scalar_one_or_none()
 
             if existing_identity:
-                # Already bound, just update
+                # Re-bind to pairing user and update status
+                existing_identity.user_id = pairing.user_id
                 existing_identity.status = "ACTIVE"
                 existing_identity.chat_id = chat_id
                 existing_identity.last_active_at = now
                 await session.commit()
 
                 existing_user_result = await session.execute(
-                    select(UserModel).where(UserModel.user_id == existing_identity.user_id)
+                    select(UserModel).where(UserModel.user_id == pairing.user_id)
                 )
                 existing_user = existing_user_result.scalar_one_or_none()
                 if existing_user:

@@ -135,7 +135,8 @@ class TestExecutionEngineInit:
         assert engine._risk_validator is validator
         assert engine._orders == {}
         assert engine._positions == {}
-        assert engine._fills == []
+        # _fills was removed as unused dead code (A-L1)
+        assert not hasattr(engine, "_fills")
 
     def test_mode_delegates_to_adapter(self):
         adapter = _make_adapter(mode="LIVE")

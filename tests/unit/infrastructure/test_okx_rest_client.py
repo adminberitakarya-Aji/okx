@@ -155,7 +155,7 @@ class TestRequestInternals:
             assert "OK-ACCESS-KEY" not in call_kwargs.get("headers", {})
 
     async def test_request_api_error_raises(self):
-        """API errors are retried by tenacity, then wrapped in RetryError."""
+        """API errors fail fast without retrying domain/parameter errors."""
         client = _make_client()
         mock_resp = _mock_response(_okx_response(code="51000", msg="Parameter error"))
 
@@ -164,14 +164,11 @@ class TestRequestInternals:
             mock_http.request.return_value = mock_resp
             mock_ensure.return_value = mock_http
 
-            with pytest.raises(tenacity.RetryError) as exc_info:
+            with pytest.raises(OKXAPIError) as exc_info:
                 await client._request("GET", "/api/v5/account/balance")
 
-            # The underlying exception is OKXAPIError
-            last_exc = exc_info.value.last_attempt.exception()
-            assert isinstance(last_exc, OKXAPIError)
-            assert last_exc.code == "51000"
-            assert "Parameter error" in str(last_exc)
+            assert exc_info.value.code == "51000"
+            assert "Parameter error" in str(exc_info.value)
 
     async def test_request_http_error_propagates(self):
         """HTTP errors are retried by tenacity, then wrapped in RetryError."""

@@ -245,14 +245,14 @@ class RiskValidationService:
 
         # Notional-based checks require an estimated price.
         if estimated_price is None:
-            result.add_warning(
+            result.add_violation(
                 RiskViolation(
                     rule="MISSING_PRICE",
                     message=(
-                        "No price/reference_price provided for BUY; "
-                        "capital and exposure limits could not be verified."
+                        "Order rejected: price/reference_price is required to verify capital "
+                        "and exposure limits. Provide estimated_price before submitting a BUY order."
                     ),
-                    severity="MEDIUM",
+                    severity="HIGH",
                 )
             )
             return

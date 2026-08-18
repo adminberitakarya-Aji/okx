@@ -101,6 +101,17 @@ class TestMarket:
         assert len(errors) == 1
         assert "below minimum" in errors[0]
 
+    def test_validate_order_non_positive_quantity_and_price(self):
+        """Order with zero or negative price/quantity should produce error."""
+        market = Market(
+            market_id="BTC-USDT",
+            base_currency="BTC",
+            quote_currency="USDT",
+        )
+        errors = market.validate_order(Decimal("0"), Decimal("-1"))
+        assert len(errors) == 2
+        assert any("must be positive" in e for e in errors)
+
     def test_validate_order_above_max_size(self):
         """Order above max size should produce error."""
         market = Market(

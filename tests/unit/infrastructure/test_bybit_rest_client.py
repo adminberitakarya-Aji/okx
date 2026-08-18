@@ -169,7 +169,7 @@ class TestRequestInternals:
             assert result == result_payload
 
     async def test_request_api_error_nonzero_retcode(self):
-        """retCode != 0 raises BybitAPIError (wrapped in RetryError by tenacity)."""
+        """retCode != 0 raises BybitAPIError directly without retrying domain business errors."""
         client = _make_client()
         mock_resp = _mock_response(_bybit_response(ret_code=10001, ret_msg="Invalid symbol"))
 
@@ -178,13 +178,11 @@ class TestRequestInternals:
             mock_http.request.return_value = mock_resp
             mock_ensure.return_value = mock_http
 
-            with pytest.raises(tenacity.RetryError) as exc_info:
+            with pytest.raises(BybitAPIError) as exc_info:
                 await client._request("GET", "/v5/market/tickers")
 
-            last_exc = exc_info.value.last_attempt.exception()
-            assert isinstance(last_exc, BybitAPIError)
-            assert last_exc.code == "10001"
-            assert "Invalid symbol" in last_exc.message
+            assert exc_info.value.code == "10001"
+            assert "Invalid symbol" in exc_info.value.message
 
     async def test_request_missing_retcode_treated_as_error(self):
         """Missing retCode defaults to -1 → error."""
@@ -196,12 +194,10 @@ class TestRequestInternals:
             mock_http.request.return_value = mock_resp
             mock_ensure.return_value = mock_http
 
-            with pytest.raises(tenacity.RetryError) as exc_info:
+            with pytest.raises(BybitAPIError) as exc_info:
                 await client._request("GET", "/v5/market/tickers")
 
-            last_exc = exc_info.value.last_attempt.exception()
-            assert isinstance(last_exc, BybitAPIError)
-            assert last_exc.code == "-1"
+            assert exc_info.value.code == "-1"
 
 
 # ---------------------------------------------------------------------------

@@ -86,13 +86,37 @@ class BinanceWebSocketClient:
             listen_key: str = data["listenKey"]
             return listen_key
 
+    async def _keepalive_listen_key(self) -> None:
+        """Keep listenKey alive by PUTting every 30 minutes (Binance expires after 60 min)."""
+        keepalive_interval = 30 * 60  # 30 minutes
+        while self._running and self._listen_key:
+            await asyncio.sleep(keepalive_interval)
+            if not self._running or not self._listen_key:
+                break
+            try:
+                async with httpx.AsyncClient(
+                    base_url=self._settings.effective_base_url,
+                    timeout=self._settings.timeout,
+                ) as client:
+                    response = await client.put(
+                        "/api/v3/userDataStream",
+                        params={"listenKey": self._listen_key},
+                        headers={"X-MBX-APIKEY": self._settings.api_key.get_secret_value()},
+                    )
+                    response.raise_for_status()
+                    logger.info("binance_listen_key_refreshed", listen_key=self._listen_key[:8])
+            except Exception as e:
+                logger.warning("binance_listen_key_refresh_failed", error=str(e))
+
     async def connect(self) -> None:
-        """Connect to WebSocket."""
+        """Connect to WebSocket with iterative reconnect loop."""
         self._running = True
-        await self._connect()
+        while self._running:
+            await self._connect()
 
     async def _connect(self) -> None:
         """Internal connection logic."""
+        keepalive_task: asyncio.Task[None] | None = None
         try:
             url = self.ws_url
             if self._private:
@@ -103,19 +127,24 @@ class BinanceWebSocketClient:
             self._ws = await websockets.connect(url)
             logger.info("binance_ws_connected", private=self._private)
 
-            await self._message_loop()
+            # Start listenKey keepalive background task for private streams
+            if self._private and self._listen_key:
+                keepalive_task = asyncio.create_task(self._keepalive_listen_key())
 
+            await self._message_loop()
         except ConnectionClosed as e:
             logger.warning("binance_ws_connection_closed", code=e.code, reason=e.reason)
             self._notify_disconnect()
             if self._running:
                 await self._schedule_reconnect()
-
         except Exception as e:
             logger.error("binance_ws_error", error=str(e))
             self._notify_disconnect()
             if self._running:
                 await self._schedule_reconnect()
+        finally:
+            if keepalive_task and not keepalive_task.done():
+                keepalive_task.cancel()
 
     async def _message_loop(self) -> None:
         """Process incoming messages."""
@@ -161,11 +190,9 @@ class BinanceWebSocketClient:
                 logger.warning("binance_ws_ping_failed", error=str(e))
 
     async def _schedule_reconnect(self) -> None:
-        """Schedule reconnection after delay."""
+        """Schedule reconnection delay (reconnection loop handled by connect())."""
         logger.info("binance_ws_scheduling_reconnect", delay=self.RECONNECT_DELAY)
         await asyncio.sleep(self.RECONNECT_DELAY)
-        if self._running:
-            await self._connect()
 
     def _notify_disconnect(self) -> None:
         """Notify disconnect handlers."""

@@ -229,6 +229,15 @@ class TestPortfolioRisk:
         risk.update_drawdown()
         assert risk.drawdown_pct == Decimal("0")
 
+    def test_update_drawdown_clamped_when_equity_above_peak(self):
+        """Drawdown should be clamped to 0 when current equity exceeds peak."""
+        risk = PortfolioRisk(
+            peak_equity=Decimal("1000"),
+            current_equity=Decimal("1200"),
+        )
+        risk.update_drawdown()
+        assert risk.drawdown_pct == Decimal("0")
+
 
 class TestMarketRiskAssessment:
     """Tests for MarketRiskAssessment."""

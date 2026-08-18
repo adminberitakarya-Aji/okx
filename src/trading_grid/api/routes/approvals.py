@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from typing import cast
 
 import structlog
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from trading_grid.api.routes.dependencies import get_default_container
 from trading_grid.api.schemas.approvals import (
@@ -21,6 +21,7 @@ from trading_grid.api.schemas.approvals import (
     ApprovalType,
 )
 from trading_grid.application.services.approval import ApprovalError, ApprovalRequest
+from trading_grid.application.services.authorization import PermissionLevel
 
 logger = structlog.get_logger()
 
@@ -40,59 +41,49 @@ def _approval_to_response(approval: ApprovalRequest) -> ApprovalResponse:
 
     return ApprovalResponse(
         approval_id=approval.approval_id,
-        approval_type=approval_type,
+        operation_type=approval_type,
         status=approval.status,
         requested_by=approval.requested_by,
-        approved_by=approval.decided_by,
-        blueprint_id=approval.blueprint_id,
-        market_id=approval.market_id,
-        environment=approval.environment,
-        capital_allocation=None,
-        conditions=[],
-        reason=approval.reason,
         requested_at=approval.requested_at,
+        description=approval.description,
+        market_id=approval.market_id,
+        blueprint_id=approval.blueprint_id,
+        environment=approval.environment,
+        decided_by=approval.decided_by,
         decided_at=approval.decided_at,
         expires_at=approval.expires_at,
+        reason=approval.reason,
     )
 
 
 @router.get("", response_model=ApprovalListResponse)
-async def list_approvals() -> ApprovalListResponse:
+async def list_approvals(
+    status: str | None = None,
+    environment: str | None = None,
+) -> ApprovalListResponse:
     """
-    List all approval requests.
+    List approval requests with optional status and environment filters.
 
-    Returns approvals in any status (pending, approved, rejected, expired).
-    """
-    container = get_default_container()
-    service = container.approval_service
-
-    approvals = service.get_all_approvals()
-    pending = [a for a in approvals if a.is_pending]
-
-    responses = [_approval_to_response(a) for a in approvals]
-
-    return ApprovalListResponse(
-        approvals=responses,
-        total=len(responses),
-        pending_count=len(pending),
-    )
-
-
-@router.get("/pending", response_model=ApprovalListResponse)
-async def list_pending_approvals() -> ApprovalListResponse:
-    """
-    List pending approval requests only.
+    Authorization: VIEWER+
     """
     container = get_default_container()
     service = container.approval_service
 
-    approvals = service.get_pending_approvals()
-    responses = [_approval_to_response(a) for a in approvals]
+    if status == "PENDING":
+        approvals = service.get_pending_approvals()
+    else:
+        approvals = list(service._approvals.values())
+
+    if environment:
+        approvals = [a for a in approvals if a.environment == environment]
+
+    items = [_approval_to_response(a) for a in approvals]
+    pending_count = sum(1 for a in approvals if a.is_pending)
 
     return ApprovalListResponse(
-        approvals=responses,
-        total=len(responses),
-        pending_count=len(responses),
+        approvals=items,
+        total=len(items),
+        pending_count=pending_count,
     )
 
 
@@ -116,25 +107,34 @@ async def get_approval(approval_id: str) -> ApprovalResponse:
 
 @router.post("/{approval_id}/approve", response_model=ApprovalActionResponse)
 async def approve_approval(
-    approval_id: str, request: ApprovalActionRequest
+    approval_id: str, request: ApprovalActionRequest, http_request: Request
 ) -> ApprovalActionResponse:
     """
     Approve a pending approval request.
 
     Authorization: LEVEL 3+ (Live Trading Approval)
     """
+    identity = getattr(http_request.state, "identity", None)
+    if identity is not None and identity.permission_level < PermissionLevel.LIVE_OPERATOR:
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden: LIVE_OPERATOR (Level 3+) role required to approve requests",
+        )
+
+    actor = identity.identity_id if identity is not None else request.actor
+
     container = get_default_container()
     service = container.approval_service
 
     try:
-        approval = service.approve(approval_id, approved_by=request.actor)
+        approval = service.approve(approval_id, approved_by=actor)
     except ApprovalError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
     logger.info(
         "approval_approved",
         approval_id=approval_id,
-        approved_by=request.actor,
+        approved_by=actor,
         operation_type=approval.operation_type,
     )
 
@@ -142,7 +142,7 @@ async def approve_approval(
         approval_id=approval_id,
         action="APPROVE",
         status=approval.status,
-        decided_by=request.actor,
+        decided_by=actor,
         decided_at=datetime.now(UTC),
         reason=request.reason,
     )
@@ -150,25 +150,34 @@ async def approve_approval(
 
 @router.post("/{approval_id}/reject", response_model=ApprovalActionResponse)
 async def reject_approval(
-    approval_id: str, request: ApprovalActionRequest
+    approval_id: str, request: ApprovalActionRequest, http_request: Request
 ) -> ApprovalActionResponse:
     """
     Reject a pending approval request.
 
     Authorization: LEVEL 3+ (Live Trading Approval)
     """
+    identity = getattr(http_request.state, "identity", None)
+    if identity is not None and identity.permission_level < PermissionLevel.LIVE_OPERATOR:
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden: LIVE_OPERATOR (Level 3+) role required to reject requests",
+        )
+
+    actor = identity.identity_id if identity is not None else request.actor
+
     container = get_default_container()
     service = container.approval_service
 
     try:
-        approval = service.reject(approval_id, rejected_by=request.actor, reason=request.reason)
+        approval = service.reject(approval_id, rejected_by=actor, reason=request.reason)
     except ApprovalError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
     logger.info(
         "approval_rejected",
         approval_id=approval_id,
-        rejected_by=request.actor,
+        rejected_by=actor,
         reason=request.reason,
     )
 
@@ -176,7 +185,7 @@ async def reject_approval(
         approval_id=approval_id,
         action="REJECT",
         status=approval.status,
-        decided_by=request.actor,
+        decided_by=actor,
         decided_at=datetime.now(UTC),
         reason=request.reason,
     )

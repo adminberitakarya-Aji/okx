@@ -55,6 +55,7 @@ class AppSettings(BaseSettings):
     # development environment), unauthenticated requests receive a DEMO-only
     # identity. This is an explicit opt-in and is forbidden outside development.
     dev_auth_enabled: bool = False
+    secret_key: SecretStr = SecretStr("dev-jwt-secret-key-change-in-production")
     log_level: str = "INFO"
     timezone: str = "UTC"
 
@@ -379,7 +380,15 @@ class RiskSettings(BaseSettings):
     min_reserve_pct: Decimal = Decimal("10")
     max_exposure_pct: Decimal = Decimal("80")
 
-    @field_validator("max_drawdown_pct", "max_slippage_pct", "max_execution_cost_pct")
+    @field_validator(
+        "max_drawdown_pct",
+        "max_position_pct",
+        "min_profitable_exit_pct",
+        "max_slippage_pct",
+        "max_execution_cost_pct",
+        "min_reserve_pct",
+        "max_exposure_pct",
+    )
     @classmethod
     def validate_percentage(cls, v: Decimal) -> Decimal:
         """Percentage must be between 0 and 100."""
@@ -462,6 +471,13 @@ class Settings(BaseSettings):
         if not self.app.is_production:
             return self
 
+        # FAIL-FAST: Open access is strictly forbidden in production
+        if self.telegram.open_access:
+            raise ValueError(
+                "TELEGRAM_OPEN_ACCESS cannot be True in production environment. "
+                "Open access is intended for beta trials only."
+            )
+
         # Check each exchange for production security compliance.
         # Each entry contains: exchange name, configured flag, demo flag,
         # and the credential env var names for the error message.
@@ -530,6 +546,12 @@ def get_settings() -> Settings:
     Get cached settings instance.
 
     Settings are loaded once and cached for performance.
-    Call get_settings.cache_clear() to reload.
+    Call get_settings.cache_clear() or clear_settings_cache() to reload.
     """
     return Settings()
+
+
+def clear_settings_cache() -> None:
+    """Clear the cached settings instance for test isolation."""
+    get_settings.cache_clear()
+

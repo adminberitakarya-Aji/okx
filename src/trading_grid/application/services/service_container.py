@@ -98,6 +98,7 @@ class ServiceContainer:
             self._demo_service = DemoTradingService(
                 grid_engine=self.grid_engine,
                 execution_engine=self.execution_engine,
+                price_monitor=self.price_monitor,
             )
         return self._demo_service
 

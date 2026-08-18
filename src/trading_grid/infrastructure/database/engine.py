@@ -103,8 +103,14 @@ async def dispose_engine() -> None:
 
     Call this on application shutdown.
     """
-    get_engine.cache_clear()
-    get_session_factory.cache_clear()
+    try:
+        engine = get_engine()
+        await engine.dispose()
+    except Exception:
+        pass
+    finally:
+        get_engine.cache_clear()
+        get_session_factory.cache_clear()
 
 
 async def check_connection() -> bool:

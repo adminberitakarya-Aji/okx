@@ -82,9 +82,10 @@ class BybitWebSocketClient:
         self._disconnect_handlers.append(handler)
 
     async def connect(self) -> None:
-        """Connect to WebSocket."""
+        """Connect to WebSocket with iterative reconnect loop."""
         self._running = True
-        await self._connect()
+        while self._running:
+            await self._connect()
 
     async def _connect(self) -> None:
         """Internal connection logic."""
@@ -98,13 +99,11 @@ class BybitWebSocketClient:
                 await self._authenticate()
 
             await self._message_loop()
-
         except ConnectionClosed as e:
             logger.warning("bybit_ws_connection_closed", code=e.code, reason=e.reason)
             self._notify_disconnect()
             if self._running:
                 await self._schedule_reconnect()
-
         except Exception as e:
             logger.error("bybit_ws_error", error=str(e))
             self._notify_disconnect()
@@ -192,11 +191,9 @@ class BybitWebSocketClient:
                 logger.warning("bybit_ws_ping_failed", error=str(e))
 
     async def _schedule_reconnect(self) -> None:
-        """Schedule reconnection after delay."""
+        """Schedule reconnection delay (reconnection loop handled by connect())."""
         logger.info("bybit_ws_scheduling_reconnect", delay=self.RECONNECT_DELAY)
         await asyncio.sleep(self.RECONNECT_DELAY)
-        if self._running:
-            await self._connect()
 
     def _notify_disconnect(self) -> None:
         """Notify disconnect handlers."""

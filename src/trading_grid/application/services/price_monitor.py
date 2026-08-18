@@ -167,6 +167,15 @@ class PriceMonitorService:
         """Stop the price monitor and unsubscribe all grids."""
         self._monitored_grids.clear()
         self._is_running = False
+
+        # Cancel all in-flight background tasks
+        if self._background_tasks:
+            for task in self._background_tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*self._background_tasks, return_exceptions=True)
+            self._background_tasks.clear()
+
         logger.info("price_monitor_stopped")
 
     def monitor_grid(self, grid: GridRuntime) -> None:
@@ -260,6 +269,10 @@ class PriceMonitorService:
                 previous_price=prev_price,
                 current_price=current_price,
             )
+
+    def get_last_price(self, market_id: MarketId) -> Price | None:
+        """Get the latest recorded price for a market."""
+        return self._market_last_prices.get(market_id)
 
     def _normalize_market_id(self, raw_id: str) -> MarketId:
         """
@@ -365,12 +378,16 @@ class PriceMonitorService:
             "SELL" if price crossed up through level
             None if no crossing
         """
-        # Price crossed DOWN through level: previous > level >= current
-        if previous_price > level_price >= current_price:
+        # Price crossed DOWN through level: (previous > level >= current) or (previous == level > current)
+        if (previous_price > level_price >= current_price) or (
+            previous_price == level_price > current_price
+        ):
             return "BUY"
 
-        # Price crossed UP through level: previous < level <= current
-        if previous_price < level_price <= current_price:
+        # Price crossed UP through level: (previous < level <= current) or (previous == level < current)
+        if (previous_price < level_price <= current_price) or (
+            previous_price == level_price < current_price
+        ):
             return "SELL"
 
         return None

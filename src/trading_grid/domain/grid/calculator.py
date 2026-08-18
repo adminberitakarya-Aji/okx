@@ -19,6 +19,7 @@ Example:
 """
 
 from decimal import ROUND_HALF_UP, Decimal
+from typing import Literal
 
 from trading_grid.domain.grid.models import (
     Blueprint,
@@ -29,41 +30,52 @@ from trading_grid.domain.grid.models import (
 from trading_grid.domain.shared.errors import (
     BlueprintValidationError,
 )
-from trading_grid.domain.shared.types import Price, SectionId
+from trading_grid.domain.shared.types import (
+    MAX_GRIDS_PER_SECTION,
+    MAX_GRID_SPACING_PCT,
+    MAX_SECTIONS,
+    MIN_GRID_SPACING_PCT,
+    Price,
+    SectionId,
+)
 
 
 def calculate_grid_prices(
     blueprint: Blueprint,
-    spacing_mode: str = "geometric",
+    spacing_mode: Literal["geometric", "arithmetic"] | str = "geometric",
     decimal_places: int = 8,
 ) -> CalculatedGridPrices:
     """
-    Calculate exact grid prices for all sections in a blueprint.
+    Calculate grid prices for all sections in a Blueprint.
+
+    Pure deterministic calculation:
+    - Same blueprint + mode + decimal_places = identical prices
+    - Respects section boundaries and gaps
+    - Supports geometric and arithmetic spacing
 
     Args:
-        blueprint: The strategy blueprint to calculate prices for
-        spacing_mode: "geometric" (percentage-based) or "arithmetic" (fixed difference)
-        decimal_places: Number of decimal places for price rounding
+        blueprint: Strategy blueprint
+        spacing_mode: "geometric" (percentage-based) or "arithmetic" (equal steps)
+        decimal_places: Number of decimal places for rounding
 
     Returns:
-        CalculatedGridPrices with exact prices for each section
+        CalculatedGridPrices with price levels per section
 
     Raises:
-        BlueprintValidationError: If blueprint is invalid
-        InvalidGridSpacingError: If grid spacing is out of bounds
+        BlueprintValidationError: If blueprint fails validation
     """
-    # Validate blueprint first
+    # Validate before calculating
     errors = validate_blueprint(blueprint)
     if errors:
         raise BlueprintValidationError(
-            f"Blueprint validation failed: {errors[0]}",
+            f"Invalid blueprint: {'; '.join(errors)}",
             errors=errors,
         )
 
     section_prices: dict[SectionId, list[Price]] = {}
 
     for section in blueprint.sections:
-        prices = _calculate_section_prices(
+        prices = calculate_section_prices(
             section=section,
             spacing_mode=spacing_mode,
             decimal_places=decimal_places,
@@ -76,28 +88,22 @@ def calculate_grid_prices(
     )
 
 
-def _calculate_section_prices(
+def calculate_section_prices(
     section: Section,
-    spacing_mode: str,
-    decimal_places: int,
+    spacing_mode: Literal["geometric", "arithmetic"] | str = "geometric",
+    decimal_places: int = 8,
 ) -> list[Price]:
     """
-    Calculate grid prices for a single section.
+    Calculate grid price levels for a single Section.
 
-    For geometric spacing (default):
-        price[i] = upper_price * (1 - spacing_pct/100)^i
-
-    For arithmetic spacing:
-        price[i] = upper_price - (i * spacing_amount)
-        where spacing_amount = (upper - lower) / (grid_count - 1)
+    Prices are ordered from UPPER to LOWER (top to bottom).
+    - Level 0 = highest price (upper_price)
+    - Level N-1 = lowest price
 
     Args:
         section: The section to calculate prices for
         spacing_mode: "geometric" or "arithmetic"
         decimal_places: Decimal places for rounding
-
-    Returns:
-        List of prices from top to bottom
     """
     if section.grid_count == 1:
         return [section.upper_price]
@@ -137,11 +143,12 @@ def validate_blueprint(blueprint: Blueprint) -> list[str]:
     Validate a blueprint for calculation readiness.
 
     Checks:
-    1. At least one section exists
+    1. At least one section exists and section count <= MAX_SECTIONS
     2. Capital allocations sum to 100%
-    3. Grid spacing is within bounds
-    4. Sections are ordered correctly (top to bottom)
-    5. Section gaps are consistent
+    3. Grid spacing is within domain bounds (MIN_GRID_SPACING_PCT..MAX_GRID_SPACING_PCT)
+    4. Grid count per section is within bounds (1..MAX_GRIDS_PER_SECTION)
+    5. Sections are ordered correctly (top to bottom)
+    6. Section gaps are consistent
 
     Returns:
         List of validation error messages (empty if valid)
@@ -153,6 +160,11 @@ def validate_blueprint(blueprint: Blueprint) -> list[str]:
         errors.append("Blueprint has no sections")
         return errors
 
+    if len(blueprint.sections) > MAX_SECTIONS:
+        errors.append(
+            f"Blueprint section count ({len(blueprint.sections)}) exceeds maximum {MAX_SECTIONS}"
+        )
+
     # Check capital allocations
     allocation_errors = blueprint.validate_allocations()
     errors.extend(allocation_errors)
@@ -162,15 +174,25 @@ def validate_blueprint(blueprint: Blueprint) -> list[str]:
         # Check spacing bounds
         if section.grid_spacing_pct <= Decimal("0"):
             errors.append(f"Section {section.section_id}: spacing must be positive")
-        if section.grid_spacing_pct > Decimal("50"):
+        elif section.grid_spacing_pct < MIN_GRID_SPACING_PCT:
             errors.append(
                 f"Section {section.section_id}: spacing {section.grid_spacing_pct}% "
-                f"exceeds maximum 50%"
+                f"is below minimum {MIN_GRID_SPACING_PCT}%"
+            )
+        elif section.grid_spacing_pct > MAX_GRID_SPACING_PCT:
+            errors.append(
+                f"Section {section.section_id}: spacing {section.grid_spacing_pct}% "
+                f"exceeds maximum {MAX_GRID_SPACING_PCT}%"
             )
 
         # Check grid count
         if section.grid_count < 1:
             errors.append(f"Section {section.section_id}: grid count must be >= 1")
+        elif section.grid_count > MAX_GRIDS_PER_SECTION:
+            errors.append(
+                f"Section {section.section_id}: grid count {section.grid_count} "
+                f"exceeds maximum {MAX_GRIDS_PER_SECTION}"
+            )
 
     # Check section ordering (each section should be below previous)
     for i in range(1, len(blueprint.sections)):
