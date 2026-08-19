@@ -143,6 +143,19 @@ class Identity:
         return environment in self.allowed_environments
 
 
+# [A-H12] SYSTEM identity for system-triggered order flows.
+# Used by PriceMonitorService, background workers, and other non-human
+# callers that must pass an identity to execute_order (no bypass allowed).
+# SYSTEM_ADMIN role + both environments allows autonomous execution.
+SYSTEM_IDENTITY = Identity(
+    identity_id="system:execution",
+    identity_type="SYSTEM",
+    role=Role.SYSTEM_ADMIN,
+    allowed_environments=("DEMO", "LIVE"),
+    metadata={"source": "system-autonomous"},
+)
+
+
 @dataclass(frozen=True)
 class AuthorizationResult:
     """

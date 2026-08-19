@@ -29,6 +29,16 @@ from trading_grid.domain.grid.models import Blueprint, GridLevelModel, Section
 from trading_grid.domain.market.models import Candle, Market, OrderBook, OrderBookLevel, Ticker
 from trading_grid.domain.risk.models import RiskLimits
 from trading_grid.domain.shared.types import ExecutionMode, MarketId
+from trading_grid.application.services.authorization import Identity, Role
+
+# [A-H12] Test identity for execute_order (identity is REQUIRED).
+DEMO_IDENTITY = Identity(
+    identity_id="test-user",
+    identity_type="HUMAN",
+    role=Role.DEMO_OPERATOR,
+    allowed_environments=("DEMO",),
+)
+
 
 
 def _build_test_blueprint(market_id: str = "BTC-USDT") -> Blueprint:
@@ -69,7 +79,14 @@ async def test_complete_e2e_research_to_execution_flow():
     mock_adapter = MagicMock()
     mock_adapter.exchange_id = "OKX"
     mock_adapter.mode = "DEMO"
-    mock_adapter.get_ticker = AsyncMock(return_value={"last": "50000"})
+    # [D-M8] get_ticker returns a domain Ticker model (not a dict)
+    mock_adapter.get_ticker = AsyncMock(
+        return_value=Ticker(
+            market_id="BTC-USDT",
+            timestamp=datetime.now(UTC),
+            last_price=Decimal("50000"),
+        )
+    )
     mock_adapter.reconcile = AsyncMock(return_value={"reconciled_at": datetime.now(UTC).isoformat()})
     mock_adapter.place_order = AsyncMock(return_value="EX-ORD-E2E-999")
     mock_adapter.cancel_order = AsyncMock(return_value=True)
@@ -102,13 +119,22 @@ async def test_complete_e2e_research_to_execution_flow():
     )
 
     # 1. Create and Start Demo Grid
+    # [A-H11] Identity must match the session owner (test_user)
+    owner_identity = Identity(
+        identity_id="test_user",
+        identity_type="HUMAN",
+        role=Role.DEMO_OPERATOR,
+        allowed_environments=("DEMO",),
+    )
     blueprint = _build_test_blueprint(market_id="BTC-USDT")
     session = demo_service.create_demo_grid(blueprint=blueprint, user_id="test_user")
     assert session.status == "CREATED"
     assert session.session_id.startswith("DEMO-")
 
     # Start grid (Atomic transition to RUNNING + initial anchor order)
-    started_session = await demo_service.start_demo_grid(session.session_id)
+    started_session = await demo_service.start_demo_grid(
+        session.session_id, identity=owner_identity  # [A-H11] required
+    )
     assert started_session.status == "RUNNING"
     assert started_session.started_at is not None
 
@@ -174,6 +200,7 @@ async def test_e2e_risk_fail_closed_prevents_unauthorized_exposure():
         side="BUY",
         quantity=Decimal("1.0"),
         price=Decimal("50000"),  # Notional: $50,000 > $100 limit
+    identity=DEMO_IDENTITY,  # [A-H12] required
     )
 
     assert result.success is False

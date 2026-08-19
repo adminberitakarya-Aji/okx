@@ -10,6 +10,7 @@ exchange's specification:
 import base64
 import hashlib
 import hmac
+from urllib.parse import urlencode
 
 from trading_grid.config.settings import BinanceSettings, BybitSettings, OKXSettings
 from trading_grid.infrastructure.binance.rest_client import BinanceRestClient
@@ -330,6 +331,178 @@ class TestBybitSigning:
     def test_recv_window_constant(self):
         """RECV_WINDOW is 5000 as per Bybit spec."""
         assert RECV_WINDOW == "5000"
+
+
+# ---------------------------------------------------------------------------
+# URL Encoding & Sorted Params (NEW-M-1)
+# ---------------------------------------------------------------------------
+
+
+class TestURLEncoding:
+    """Verify URL encoding + sorted params for REST signing (Phase 9.1 [NEW-M-1])."""
+
+    def _make_okx_client(self) -> OKXRestClient:
+        settings = OKXSettings(
+            api_key="test-api-key",
+            api_secret="test-secret-key",
+            passphrase="test-passphrase",
+            demo_mode=True,
+            _env_file=None,
+        )
+        return OKXRestClient(settings)
+
+    def _make_binance_client(self) -> BinanceRestClient:
+        settings = BinanceSettings(
+            api_key="test-api-key",
+            api_secret="test-secret-key",
+            testnet_mode=True,
+            _env_file=None,
+        )
+        return BinanceRestClient(settings)
+
+    def _make_bybit_client(self) -> BybitRestClient:
+        settings = BybitSettings(
+            api_key="test-api-key",
+            api_secret="test-secret-key",
+            testnet_mode=True,
+            _env_file=None,
+        )
+        return BybitRestClient(settings)
+
+    def test_okx_query_string_url_encodes_special_chars(self):
+        """OKX query string must URL-encode special chars in values."""
+        params = {"instId": "BTC+USDT", "bar": "1H&x=1"}
+        sorted_params = sorted(params.items())
+        query_string = "?" + urlencode(sorted_params)
+        # '+' must be encoded as %2B, '&' as %26, '=' as %3D
+        assert "%2B" in query_string
+        assert "%26" in query_string
+        assert "BTC%2BUSDT" in query_string
+        assert "1H%26x%3D1" in query_string
+
+    def test_okx_signature_with_special_chars_matches_encoded_query(self):
+        """Signature with '+' or '&' in value must match OKX spec (encoded)."""
+        client = self._make_okx_client()
+        timestamp = "2026-08-16T08:00:00.000Z"
+        method = "GET"
+        params = {"instId": "BTC+USDT", "bar": "1H&x=1"}
+        sorted_params = sorted(params.items())
+        query_string = "?" + urlencode(sorted_params)
+        full_path = "/api/v5/market/candles" + query_string
+
+        signature = client._sign_request(timestamp, method, full_path, "")
+
+        # Verify independently with the encoded path
+        message = f"{timestamp}{method}{full_path}"
+        expected = base64.b64encode(
+            hmac.new(
+                b"test-secret-key",
+                message.encode("utf-8"),
+                hashlib.sha256,
+            ).digest()
+        ).decode("utf-8")
+        assert signature == expected
+
+    def test_okx_sorted_params_deterministic_signature(self):
+        """OKX signature must be identical regardless of param insertion order."""
+        client = self._make_okx_client()
+        timestamp = "2026-08-16T08:00:00.000Z"
+        method = "GET"
+
+        params_a = {"instId": "BTC-USDT", "ordId": "1", "sz": "0.001"}
+        params_b = {"sz": "0.001", "ordId": "1", "instId": "BTC-USDT"}
+
+        path_a = "/api/v5/trade/order?" + urlencode(sorted(params_a.items()))
+        path_b = "/api/v5/trade/order?" + urlencode(sorted(params_b.items()))
+
+        sig_a = client._sign_request(timestamp, method, path_a, "")
+        sig_b = client._sign_request(timestamp, method, path_b, "")
+        assert sig_a == sig_b
+
+    def test_binance_signature_with_sorted_params(self):
+        """Binance signature requires sorted params — identical regardless of order."""
+        client = self._make_binance_client()
+
+        params_a = {"symbol": "BTCUSDT", "side": "BUY", "quantity": "0.001"}
+        params_b = {"quantity": "0.001", "side": "BUY", "symbol": "BTCUSDT"}
+
+        query_a = urlencode(sorted(params_a.items()))
+        query_b = urlencode(sorted(params_b.items()))
+
+        sig_a = client._sign_query(query_a)
+        sig_b = client._sign_query(query_b)
+        assert sig_a == sig_b
+        assert query_a == query_b
+
+    def test_binance_query_string_url_encodes_special_chars(self):
+        """Binance query string must URL-encode special chars in values."""
+        params = {"symbol": "BTC+USDT", "newClientOrderId": "order&id=1"}
+        sorted_params = sorted(params.items())
+        query_string = urlencode(sorted_params)
+        assert "%2B" in query_string
+        assert "%26" in query_string
+        assert "BTC%2BUSDT" in query_string
+        assert "order%26id%3D1" in query_string
+
+    def test_binance_signature_with_special_chars_matches_encoded_query(self):
+        """Binance signature with special chars must sign the encoded query string."""
+        client = self._make_binance_client()
+        params = {"symbol": "BTC+USDT", "newClientOrderId": "order&id=1"}
+        sorted_params = sorted(params.items())
+        query_string = urlencode(sorted_params)
+
+        signature = client._sign_query(query_string)
+
+        expected = hmac.new(
+            b"test-secret-key",
+            query_string.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+        assert signature == expected
+
+    def test_bybit_query_string_url_encodes_special_chars(self):
+        """Bybit query string must URL-encode special chars in values."""
+        params = {"symbol": "BTC+USDT", "category": "spot&x=1"}
+        sorted_params = sorted(params.items())
+        params_str = urlencode(sorted_params)
+        assert "%2B" in params_str
+        assert "%26" in params_str
+        assert "BTC%2BUSDT" in params_str
+        assert "spot%26x%3D1" in params_str
+
+    def test_bybit_signature_with_special_chars_matches_encoded_query(self):
+        """Bybit signature with special chars must sign the encoded query string."""
+        client = self._make_bybit_client()
+        timestamp = "1691841600000"
+        params = {"symbol": "BTC+USDT", "category": "spot&x=1"}
+        sorted_params = sorted(params.items())
+        params_str = urlencode(sorted_params)
+
+        signature = client._sign(timestamp, params_str)
+
+        message = f"{timestamp}test-api-key{RECV_WINDOW}{params_str}"
+        expected = hmac.new(
+            b"test-secret-key",
+            message.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+        assert signature == expected
+
+    def test_bybit_sorted_params_deterministic_signature(self):
+        """Bybit signature must be identical regardless of param insertion order."""
+        client = self._make_bybit_client()
+        timestamp = "1691841600000"
+
+        params_a = {"category": "spot", "symbol": "BTCUSDT", "limit": "10"}
+        params_b = {"limit": "10", "symbol": "BTCUSDT", "category": "spot"}
+
+        params_str_a = urlencode(sorted(params_a.items()))
+        params_str_b = urlencode(sorted(params_b.items()))
+
+        sig_a = client._sign(timestamp, params_str_a)
+        sig_b = client._sign(timestamp, params_str_b)
+        assert sig_a == sig_b
+        assert params_str_a == params_str_b
 
 
 # ---------------------------------------------------------------------------

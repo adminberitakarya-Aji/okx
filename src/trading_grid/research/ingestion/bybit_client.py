@@ -15,6 +15,7 @@ Reference: https://bybit-exchange.github.io/docs/v5/market/kline
 from __future__ import annotations
 
 import asyncio
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -159,7 +160,9 @@ class BybitHistoricalClient:
         self.max_retries = max_retries
         self._client: httpx.AsyncClient | None = None
         self._last_request_time: float = 0.0
-        self._lock = asyncio.Lock()
+        # [NEW-M-6] Use Semaphore instead of Lock to allow concurrent
+        # requests while still respecting the rate limit interval.
+        self._semaphore = asyncio.Semaphore(10)  # 10 concurrent requests
 
     @property
     def active_base_url(self) -> str:
@@ -182,12 +185,14 @@ class BybitHistoricalClient:
 
     async def _rate_limit_wait(self) -> None:
         """Wait to respect rate limits."""
-        async with self._lock:
-            now = asyncio.get_event_loop().time()
+        # [NEW-M-6] Semaphore allows concurrent requests (up to 10) while
+        # still enforcing the minimum interval between actual API calls.
+        async with self._semaphore:
+            now = time.monotonic()
             elapsed = now - self._last_request_time
             if elapsed < REQUEST_INTERVAL:
                 await asyncio.sleep(REQUEST_INTERVAL - elapsed)
-            self._last_request_time = asyncio.get_event_loop().time()
+            self._last_request_time = time.monotonic()
 
     @retry(
         retry=retry_if_exception_type((httpx.TransportError, BybitRateLimitError)),

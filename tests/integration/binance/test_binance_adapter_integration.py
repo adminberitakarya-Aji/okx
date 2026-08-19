@@ -15,7 +15,7 @@ from trading_grid.config.settings import BinanceSettings
 from trading_grid.domain.execution.models import Order
 from trading_grid.infrastructure.binance.adapter import BinanceAdapter
 from trading_grid.infrastructure.binance.rest_client import BinanceAPIError
-from trading_grid.infrastructure.exchange.symbols import (
+from trading_grid.domain.market.symbols import (
     to_concatenated_symbol,
     to_normalized_market_id,
 )
@@ -87,7 +87,7 @@ class TestBinanceAdapterIntegration:
         assert market.min_order_size == Decimal("0.00001")
         assert market.tick_size == Decimal("0.01")
 
-    async def test_get_ticker_returns_raw_dict(self):
+    async def test_get_ticker_returns_domain_model(self):
         """get_ticker returns the raw ticker dict from Binance."""
         adapter = _make_adapter()
         adapter._rest.get_ticker.return_value = {
@@ -100,8 +100,10 @@ class TestBinanceAdapterIntegration:
 
         ticker = await adapter.get_ticker("BTC-USDT")
 
-        assert ticker["symbol"] == "BTCUSDT"
-        assert ticker["lastPrice"] == "50000.00"
+        assert ticker.market_id == "BTC-USDT"
+        assert ticker.last_price == Decimal("50000.00")
+        assert ticker.bid_price == Decimal("49999.00")
+        assert ticker.ask_price == Decimal("50001.00")
         adapter._rest.get_ticker.assert_called_once_with("BTCUSDT")
 
     async def test_get_orderbook_returns_domain_model(self):

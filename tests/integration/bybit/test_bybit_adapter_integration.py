@@ -15,7 +15,7 @@ from trading_grid.config.settings import BybitSettings
 from trading_grid.domain.execution.models import Order
 from trading_grid.infrastructure.bybit.adapter import BybitAdapter
 from trading_grid.infrastructure.bybit.rest_client import BybitAPIError
-from trading_grid.infrastructure.exchange.symbols import (
+from trading_grid.domain.market.symbols import (
     to_concatenated_symbol,
     to_normalized_market_id,
 )
@@ -70,17 +70,22 @@ class TestBybitAdapterIntegration:
 
         ticker = await adapter.get_ticker("BTC-USDT")
 
-        assert ticker["symbol"] == "BTCUSDT"
-        assert ticker["lastPrice"] == "50000.00"
+        # [D-M8] Adapter returns a normalized Ticker domain model
+        assert ticker.market_id == "BTC-USDT"
+        assert ticker.last_price == Decimal("50000.00")
+        assert ticker.bid_price == Decimal("49999.00")
+        assert ticker.ask_price == Decimal("50001.00")
         adapter._rest.get_ticker.assert_called_once_with("BTCUSDT", category="spot")
 
     async def test_get_ticker_empty_list(self):
-        """get_ticker returns empty dict when no data."""
+        """get_ticker returns an empty Ticker model when no data."""
         adapter = _make_adapter()
         adapter._rest.get_ticker.return_value = {"list": []}
 
         ticker = await adapter.get_ticker("BTC-USDT")
-        assert ticker == {}
+        # [D-M8] Adapter always returns a Ticker domain model (zeroed on empty)
+        assert ticker.market_id == "BTC-USDT"
+        assert ticker.last_price == Decimal("0")
 
     async def test_get_orderbook_returns_domain_model(self):
         """get_orderbook returns a properly parsed OrderBook domain object."""

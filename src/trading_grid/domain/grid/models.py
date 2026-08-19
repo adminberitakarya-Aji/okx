@@ -195,6 +195,9 @@ class Blueprint:
         created_at: Creation timestamp (UTC)
         updated_at: Last update timestamp (UTC)
         metadata: Additional metadata (regime, scores, etc.)
+        user_id: Owner of this blueprint (identity_id of the creator).
+            [I-C3] Used for ownership checks on grid start. None for
+            system-generated or legacy blueprints (treated as unowned).
     """
 
     blueprint_id: BlueprintId
@@ -205,6 +208,7 @@ class Blueprint:
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     metadata: dict[str, object] = field(default_factory=dict)
+    user_id: str | None = None
 
     def __post_init__(self) -> None:
         """Validate blueprint constraints."""

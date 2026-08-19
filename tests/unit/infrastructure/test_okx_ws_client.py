@@ -397,6 +397,85 @@ class TestDisconnect:
 # ---------------------------------------------------------------------------
 
 
+class TestScheduleReconnect:
+    async def test_schedule_reconnect_uses_backoff(self):
+        """[NEW-M-3] _schedule_reconnect should use exponential backoff."""
+        client = _make_client()
+        client._reconnect_attempt = 0
+
+        with (
+            patch(
+                "trading_grid.infrastructure.okx.websocket_client.ws_reconnect_delay",
+                return_value=1.5,
+            ) as mock_delay,
+            patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+        ):
+            await client._schedule_reconnect()
+
+        mock_delay.assert_called_once_with(0)
+        mock_sleep.assert_awaited_once_with(1.5)
+        assert client._reconnect_attempt == 1
+
+    async def test_schedule_reconnect_increments_attempt(self):
+        """[NEW-M-3] Each reconnect should increment the attempt counter."""
+        client = _make_client()
+        client._reconnect_attempt = 2
+
+        with (
+            patch(
+                "trading_grid.infrastructure.okx.websocket_client.ws_reconnect_delay",
+                return_value=4.0,
+            ) as mock_delay,
+            patch("asyncio.sleep", new_callable=AsyncMock),
+        ):
+            await client._schedule_reconnect()
+
+        mock_delay.assert_called_once_with(2)
+        assert client._reconnect_attempt == 3
+
+    async def test_connect_resets_attempt_counter(self):
+        """[NEW-M-3] connect() should reset the attempt counter."""
+        client = _make_client()
+        client._reconnect_attempt = 5
+        fake_ws = FakeWS()
+
+        async def recv():
+            client._running = False
+            return json.dumps({"event": "pong"})
+
+        fake_ws._recv = recv
+
+        with patch(
+            "trading_grid.infrastructure.okx.websocket_client.websockets.connect",
+            new_callable=AsyncMock,
+            return_value=fake_ws,
+        ):
+            await client.connect()
+
+        assert client._reconnect_attempt == 0
+
+    async def test_successful_connect_resets_attempt_counter(self):
+        """[NEW-M-3] Successful _connect() should reset the attempt counter."""
+        client = _make_client()
+        client._reconnect_attempt = 3
+        fake_ws = FakeWS()
+
+        async def recv():
+            client._running = False
+            return json.dumps({"event": "pong"})
+
+        fake_ws._recv = recv
+
+        with patch(
+            "trading_grid.infrastructure.okx.websocket_client.websockets.connect",
+            new_callable=AsyncMock,
+            return_value=fake_ws,
+        ), patch.object(client, "_message_loop", new_callable=AsyncMock):
+            await client._connect()
+
+        assert client._reconnect_attempt == 0
+
+
 class TestNotifyDisconnect:
     def test_notify_disconnect_calls_handlers(self):
         client = _make_client()

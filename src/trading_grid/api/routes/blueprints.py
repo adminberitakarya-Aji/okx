@@ -11,10 +11,11 @@ from decimal import Decimal
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
-from trading_grid.api.routes.dependencies import get_default_container
+from trading_grid.api.routes.dependencies import get_current_identity, get_default_container
 from trading_grid.api.schemas.grid import BlueprintResponse, SectionResponse
+from trading_grid.application.services.authorization import Identity
 from trading_grid.domain.grid.models import Blueprint
 
 logger = structlog.get_logger()
@@ -91,12 +92,15 @@ async def generate_blueprint(
     # to support richer configuration options and align with REST best practices.
     market_id: str = Query(..., description="Market ID (e.g., BTC-USDT)"),
     capital: Decimal = Query(default=Decimal("1000"), description="Total capital allocation"),
+    identity: Identity = Depends(get_current_identity),  # [I-C3] require identity
 ) -> BlueprintResponse:
     """
     Generate a new default blueprint for a market.
 
     Uses the BlueprintGenerator's default (conservative) configuration
     anchored to the current market price when available.
+
+    [I-C3] The blueprint is owned by the authenticated identity.
     """
     container = get_default_container()
     service = container.research_service
@@ -120,6 +124,7 @@ async def generate_blueprint(
             market_id=market_id_upper,
             current_price=current_price,
             capital=capital,
+            user_id=identity.identity_id,  # [I-C3] set owner
         )
     except Exception as e:
         logger.error("blueprint_generation_failed", market_id=market_id, error=str(e))

@@ -20,6 +20,7 @@ import hmac
 import json
 import time
 from typing import Any
+from urllib.parse import urlencode
 
 import httpx
 import structlog
@@ -166,7 +167,11 @@ class BybitRestClient:
         if method.upper() == "GET":
             params_str = ""
             if params:
-                params_str = "&".join(f"{k}={v}" for k, v in params.items())
+                # NOTE: Params are sorted + url-encoded to match Bybit signing spec.
+                # Values with special chars (+, &, =) must be encoded or the
+                # signature will mismatch the server-side verification.
+                sorted_params = sorted(params.items())
+                params_str = urlencode(sorted_params)
             if signed:
                 headers = self._get_auth_headers(timestamp, params_str)
             response = await client.request(method=method, url=path, params=params, headers=headers)

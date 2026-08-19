@@ -1,7 +1,7 @@
 """
 [I-M8] Telegram command handlers.
 
-Extracted from the monolithic handlers.py. Contains all /command handlers:
+Extracted from the monolithic handlers module. Contains all /command handlers:
 - cmd_start (state-aware + pairing deep-link)
 - cmd_help, cmd_menu, cmd_status, cmd_account
 - cmd_stop_all (emergency stop)
@@ -50,7 +50,7 @@ async def cmd_start(message: Message) -> None:
 
     States:
     1. New user: Welcome + Create Account button
-    2. Returning user (no OKX): Welcome back + Connect OKX
+    2. Returning user (no OKX): Welcome + Connect OKX
     3. Returning user (OKX connected): Welcome back + Main menu
     """
     if message.from_user is None:
@@ -82,7 +82,7 @@ async def cmd_start(message: Message) -> None:
                 )
                 await message.answer(
                     f"✅ <b>Account Linked!</b>\n\n"
-                    f"Telegram account successfully linked to your trading account.\n"
+                    f"Telegram account linked to your trading account successfully.\n"
                     f"Welcome, <b>{first_name}</b>! Use /menu to get started.",
                     parse_mode="HTML",
                 )
@@ -193,22 +193,72 @@ async def cmd_menu(message: Message) -> None:
 
 
 async def cmd_status(message: Message) -> None:
-    """Handle /status command."""
+    """
+    Handle /status command.
+
+    [TD-2] Exchange-agnostic: shows status across all configured exchanges.
+    """
     if not await check_authorization(message):
         return
 
-    # TODO: Integrate with application layer to get real status
+    multi = get_multi_container()
+    default_container = get_service_container()
+    settings = get_settings()
+
+    # Collect status from all exchanges
+    total_active_grids = 0
+    exchange_status: dict[str, int] = {}
+
+    containers: list[tuple[str, ServiceContainer]] = []
+    if multi is not None and getattr(multi, "_containers", None):
+        containers.extend(multi._containers.items())
+    elif default_container is not None:
+        exchange_name = getattr(default_container, "exchange_id", "OKX")
+        containers.append((exchange_name, default_container))
+
+    for exchange_id, container in containers:
+        try:
+            active_grids = container.grid_engine.get_active_grids()
+            exchange_status[exchange_id] = len(active_grids)
+            total_active_grids += len(active_grids)
+        except Exception:
+            exchange_status[exchange_id] = 0
+
+    # Get pending approvals count
+    pending_approvals = 0
+    if default_container is not None:
+        try:
+            pending = default_container.approval_service.get_pending_approvals()
+            pending_approvals = len(pending) if pending else 0
+        except Exception:
+            pass
+
+    # Build exchange status lines
+    configured = ExchangeAdapterFactory.get_configured_exchanges(settings)
+    exchange_lines = []
+    for ex in SUPPORTED_EXCHANGES:
+        if ex in configured:
+            grid_count = exchange_status.get(ex, 0)
+            exchange_lines.append(f"  ✅ {ex}: {grid_count} grid(s)")
+        else:
+            exchange_lines.append(f"  ⬜ {ex}: not configured")
+
     await message.answer(
-        "📊 <b>System Status</b>\n\n"
-        "Status: <code>OPERATIONAL</code>\n"
-        "Mode: <code>DEMO</code>\n"
-        "Active Grids: 0\n"
-        "Pending Approvals: 0"
+        "📊 <b>System Status</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        f"Status: <code>OPERATIONAL</code>\n"
+        f"Active Grids: <b>{total_active_grids}</b>\n"
+        f"Pending Approvals: <b>{pending_approvals}</b>\n\n"
+        "<b>Exchanges:</b>\n" + "\n".join(exchange_lines)
     )
 
 
 async def cmd_account(message: Message) -> None:
-    """Handle /account command."""
+    """
+    Handle /account command.
+
+    [TD-2] Exchange-agnostic: shows account status across all exchanges.
+    """
     if not await check_authorization(message):
         return
 
@@ -220,13 +270,54 @@ async def cmd_account(message: Message) -> None:
         await message.answer("Please use /start to create your account first.")
         return
 
-    okx_connected = await _user_service.is_okx_connected(message.from_user.id)
-    okx = await _user_service.get_okx_integration(user.user_id)
-    okx_verified = okx.status == "VERIFIED" if okx else False
-    environment = okx.environment if okx else "DEMO"
+    # Get exchange integration status for all exchanges
+    settings = get_settings()
+    configured = ExchangeAdapterFactory.get_configured_exchanges(settings)
+
+    # Check user's exchange integrations
+    exchange_lines = []
+    any_connected = False
+    primary_environment = "DEMO"
+
+    for exchange_id in SUPPORTED_EXCHANGES:
+        if exchange_id not in configured:
+            exchange_lines.append(f"  ⬜ {exchange_id}: not configured")
+            continue
+
+        try:
+            integration = await _user_service.get_exchange_integration(
+                user.user_id, exchange_id
+            )
+            if integration is not None:
+                any_connected = True
+                status_icon = "🟢" if integration.status == "VERIFIED" else "🟡"
+                exchange_lines.append(
+                    f"  {status_icon} {exchange_id}: {integration.environment} ({integration.status})"
+                )
+                if exchange_id == "OKX":
+                    primary_environment = integration.environment
+            else:
+                exchange_lines.append(f"  🔴 {exchange_id}: not connected")
+        except Exception:
+            exchange_lines.append(f"  ⬜ {exchange_id}: unknown")
+
+    # Fallback to OKX-specific check for backward compatibility
+    if not any_connected:
+        okx_connected = await _user_service.is_okx_connected(message.from_user.id)
+        okx = await _user_service.get_okx_integration(user.user_id)
+        if okx_connected or okx is not None:
+            any_connected = True
+            okx_verified = okx.status == "VERIFIED" if okx else False
+            primary_environment = okx.environment if okx else "DEMO"
+            status_icon = "🟢" if okx_verified else "🟡"
+            exchange_lines = [f"  {status_icon} OKX: {primary_environment}"]
 
     await message.answer(
-        format_account_status(environment, okx_connected, okx_verified),
+        "👤 <b>ACCOUNT STATUS</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        f"<b>User ID:</b> <code>{user.user_id}</code>\n"
+        f"<b>Environment:</b> {primary_environment}\n\n"
+        "<b>Exchange Connections:</b>\n" + "\n".join(exchange_lines),
         reply_markup=account_menu_keyboard(),
     )
 
@@ -259,7 +350,7 @@ async def cmd_stop_all(message: Message) -> None:
 
     for exchange_id, container in containers_to_stop:
         try:
-            stopped = container.demo_service.emergency_stop_all(reason=reason)
+            stopped = container.demo_service.emergency_stop(reason=reason)
             if stopped:
                 all_stopped.extend(stopped)
                 exchange_counts[exchange_id] = len(stopped)

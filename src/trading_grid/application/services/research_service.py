@@ -570,6 +570,7 @@ class ResearchService:
         recommendation: MarketRecommendation,
         current_price: Price,
         capital: Decimal | None = None,
+        user_id: str | None = None,
     ) -> Blueprint:
         """
         Generate a blueprint from a recommendation.
@@ -578,6 +579,8 @@ class ResearchService:
             recommendation: Market recommendation
             current_price: Current market price
             capital: Total capital
+            user_id: Owner of the blueprint (identity_id of the creator).
+                [I-C3] Used for ownership checks on grid start.
 
         Returns:
             Generated Blueprint
@@ -587,6 +590,9 @@ class ResearchService:
             current_price=current_price,
             capital=capital,
         )
+
+        # [I-C3] Set blueprint owner
+        blueprint.user_id = user_id
 
         # Fill the recommended_blueprint_id slot
         recommendation.recommended_blueprint_id = blueprint.blueprint_id
@@ -601,6 +607,7 @@ class ResearchService:
         market_id: MarketId,
         current_price: Price,
         capital: Decimal | None = None,
+        user_id: str | None = None,
     ) -> Blueprint:
         """
         Generate a default blueprint without ML recommendation.
@@ -609,6 +616,8 @@ class ResearchService:
             market_id: Market to trade
             current_price: Current market price
             capital: Total capital
+            user_id: Owner of the blueprint (identity_id of the creator).
+                [I-C3] Used for ownership checks on grid start.
 
         Returns:
             Conservative Blueprint
@@ -618,6 +627,9 @@ class ResearchService:
             current_price=current_price,
             capital=capital,
         )
+
+        # [I-C3] Set blueprint owner
+        blueprint.user_id = user_id
 
         self._blueprints[blueprint.blueprint_id] = blueprint
         return blueprint

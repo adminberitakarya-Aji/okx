@@ -20,6 +20,16 @@ from trading_grid.application.services.risk_validation import RiskValidationServ
 from trading_grid.domain.execution.models import Position
 from trading_grid.domain.risk.models import PortfolioRisk, RiskLimits
 from trading_grid.infrastructure.okx.adapter import OKXAdapter
+from trading_grid.application.services.authorization import Identity, Role
+
+# [A-H12] Test identity for execute_order (identity is REQUIRED).
+DEMO_IDENTITY = Identity(
+    identity_id="test-user",
+    identity_type="HUMAN",
+    role=Role.DEMO_OPERATOR,
+    allowed_environments=("DEMO",),
+)
+
 
 
 def make_limits(**overrides: object) -> RiskLimits:
@@ -228,6 +238,7 @@ class TestExecutionEngineRiskWiring:
             side="BUY",
             quantity=Decimal("0.001"),
             price=Decimal("50000"),
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is True
@@ -244,6 +255,7 @@ class TestExecutionEngineRiskWiring:
             side="BUY",
             quantity=Decimal("0.01"),
             price=Decimal("50000"),  # notional 500 > 100 per-grid limit
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is False
@@ -262,6 +274,7 @@ class TestExecutionEngineRiskWiring:
             side="SELL",
             quantity=Decimal("0.001"),
             price=Decimal("50000"),
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is False
@@ -279,6 +292,7 @@ class TestExecutionEngineRiskWiring:
             side="BUY",
             quantity=Decimal("0.01"),
             price=Decimal("50000"),
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         order = engine.get_order(result.order_id)

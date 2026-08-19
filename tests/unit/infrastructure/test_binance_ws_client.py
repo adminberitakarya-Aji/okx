@@ -307,6 +307,92 @@ class TestCreateListenKey:
 
             key = await client._create_listen_key()
             assert key == "abc123"
+            # [NEW-M-4] async with must be used — connection closed properly
+            mock_client.__aexit__.assert_awaited_once()
+
+    async def test_create_listen_key_closes_on_exception(self):
+        """[NEW-M-4] Client must be closed even when request raises."""
+        client = _make_client(private=True)
+
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.post.side_effect = Exception("connection error")
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client_cls.return_value = mock_client
+
+            with pytest.raises(Exception, match="connection error"):
+                await client._create_listen_key()
+            # [NEW-M-4] __aexit__ must be called even on exception (no leak)
+            mock_client.__aexit__.assert_awaited_once()
+
+
+class TestKeepaliveListenKey:
+    async def test_keepalive_closes_client_no_leak(self):
+        """[NEW-M-4] Keepalive must close httpx client (no connection leak)."""
+        client = _make_client(private=True)
+        client._running = True
+        client._listen_key = "test-listen-key"
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status = MagicMock()
+
+        # Simulate one keepalive cycle then stop
+        sleep_count = 0
+
+        async def fake_sleep(_):
+            nonlocal sleep_count
+            sleep_count += 1
+            if sleep_count >= 2:
+                client._running = False
+
+        with (
+            patch("asyncio.sleep", side_effect=fake_sleep),
+            patch("httpx.AsyncClient") as mock_client_cls,
+        ):
+            mock_client = AsyncMock()
+            mock_client.put.return_value = mock_resp
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client_cls.return_value = mock_client
+
+            await client._keepalive_listen_key()
+
+            # [NEW-M-4] async with must be used — connection closed properly
+            mock_client.__aexit__.assert_awaited_once()
+            mock_client.put.assert_awaited_once()
+            # put should include listenKey
+            call_kwargs = mock_client.put.call_args[1]
+            assert call_kwargs["params"]["listenKey"] == "test-listen-key"
+
+    async def test_keepalive_closes_on_exception(self):
+        """[NEW-M-4] Keepalive client must be closed even on API error."""
+        client = _make_client(private=True)
+        client._running = True
+        client._listen_key = "test-listen-key"
+
+        # Simulate one cycle: put raises, then stop
+        sleep_count = 0
+
+        async def fake_sleep(_):
+            nonlocal sleep_count
+            sleep_count += 1
+            if sleep_count >= 2:
+                client._running = False
+
+        with (
+            patch("asyncio.sleep", side_effect=fake_sleep),
+            patch("httpx.AsyncClient") as mock_client_cls,
+        ):
+            mock_client = AsyncMock()
+            mock_client.put.side_effect = Exception("API error")
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client_cls.return_value = mock_client
+
+            await client._keepalive_listen_key()  # should not raise
+
+            # [NEW-M-4] __aexit__ must be called even on exception (no leak)
+            mock_client.__aexit__.assert_awaited_once()
 
 
 # ---------------------------------------------------------------------------
@@ -323,7 +409,9 @@ class TestSubscribeTicker:
         msg = json.loads(fake_ws.sent[0])
         assert msg["method"] == "SUBSCRIBE"
         assert msg["params"] == ["btcusdt@ticker"]
-        assert msg["id"] == 1
+        # [NEW-CR-1] id is now a unique millisecond timestamp, not hardcoded 1
+        assert isinstance(msg["id"], int)
+        assert msg["id"] > 0
 
     async def test_subscribe_ticker_not_connected_raises(self):
         client = _make_client()

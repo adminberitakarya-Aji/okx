@@ -30,9 +30,15 @@ from trading_grid.application.services.tenant_limits import (
 from trading_grid.domain.exchange.errors import ExchangeAPIError
 from trading_grid.domain.exchange.interface import ExchangeAdapter
 from trading_grid.domain.execution.models import Order, Position
-from trading_grid.domain.risk.models import (
-    RiskValidationResult,
-    RiskViolation,
+from trading_grid.domain.risk.models import RiskValidationResult, RiskViolation
+from trading_grid.application.services.authorization import Identity, PermissionLevel, Role
+
+# [A-H12] Test identity for execute_order (identity is REQUIRED).
+DEMO_IDENTITY = Identity(
+    identity_id="test-user",
+    identity_type="HUMAN",
+    role=Role.DEMO_OPERATOR,
+    allowed_environments=("DEMO",),
 )
 
 
@@ -163,6 +169,7 @@ class TestExecuteOrder:
             side="BUY",
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is True
@@ -182,6 +189,7 @@ class TestExecuteOrder:
             side="BUY",
             quantity=Decimal("0.01"),
             price=Decimal("49000"),
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is True
@@ -201,6 +209,7 @@ class TestExecuteOrder:
             side="SELL",
             quantity=Decimal("1"),
             reference_price=Decimal("3000"),
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         order = engine.get_order(result.order_id)
@@ -219,6 +228,7 @@ class TestExecuteOrder:
             side="BUY",
             quantity=Decimal("10"),
             price=Decimal("50000"),
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is False
@@ -243,6 +253,7 @@ class TestExecuteOrder:
             quantity=Decimal("0.5"),
             price=Decimal("48000"),
             reference_price=Decimal("48100"),
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         validator.validate_order.assert_called_once()
@@ -264,6 +275,7 @@ class TestExecuteOrder:
             side="BUY",
             quantity=Decimal("0.01"),
             price=Decimal("50000"),
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is True
@@ -280,6 +292,7 @@ class TestExecuteOrder:
             side="BUY",
             quantity=Decimal("0.01"),
             price=Decimal("50000"),
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         adapter.reconcile.assert_not_awaited()
@@ -298,6 +311,7 @@ class TestExecuteOrder:
             side="BUY",
             quantity=Decimal("0.01"),
             price=Decimal("50000"),
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is False
@@ -318,6 +332,7 @@ class TestExecuteOrder:
             side="BUY",
             quantity=Decimal("0.01"),
             price=Decimal("50000"),
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is False
@@ -338,6 +353,7 @@ class TestExecuteOrder:
             quantity=Decimal("5"),
             price=Decimal("150"),
             metadata={"grid_level": 3, "section_id": 1},
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         order = engine.get_order(result.order_id)
@@ -358,11 +374,156 @@ class TestExecuteOrder:
             side="BUY",
             quantity=Decimal("0.01"),
             price=Decimal("50000"),
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         order = engine.get_order(result.order_id)
         assert order is not None
         assert order.metadata == {}
+
+
+class TestExecuteOrderIdentity:
+    """[A-H12] Tests for identity-required enforcement in execute_order.
+
+    Phase 8.6 (A-H12): identity is now REQUIRED on every execute_order call.
+    No caller may bypass authorization:
+    1. Passing no identity raises ValueError (fail-closed).
+    2. An identity without access to the engine environment is rejected.
+    3. An identity with insufficient permission level is rejected.
+    4. A valid DEMO_OPERATOR identity can execute in DEMO.
+    5. SYSTEM identity (both environments) can execute autonomously.
+    """
+
+    @pytest.mark.asyncio
+    async def test_missing_identity_raises_value_error(self):
+        """[A-H12] execute_order without identity raises ValueError (fail-closed)."""
+        engine = _make_engine()
+
+        with pytest.raises(ValueError, match="identity is required"):
+            await engine.execute_order(
+                market_id="BTC-USDT",
+                side="BUY",
+                quantity=Decimal("0.01"),
+                price=Decimal("50000"),
+            )
+
+    @pytest.mark.asyncio
+    async def test_identity_without_environment_access_rejected(self):
+        """[A-H12] Identity not allowed in DEMO is rejected locally."""
+        adapter = _make_adapter(mode="DEMO")
+        engine = _make_engine(adapter=adapter)
+
+        # LIVE-only identity cannot access DEMO
+        live_only = Identity(
+            identity_id="live-only-user",
+            identity_type="HUMAN",
+            role=Role.LIVE_OPERATOR,
+            allowed_environments=("LIVE",),
+        )
+
+        result = await engine.execute_order(
+            market_id="BTC-USDT",
+            side="BUY",
+            quantity=Decimal("0.01"),
+            price=Decimal("50000"),
+            identity=live_only,
+        )
+
+        assert result.success is False
+        assert "Authorization denied" in (result.error_message or "")
+        assert "not allowed in DEMO" in (result.error_message or "")
+        # Order must NOT reach the exchange
+        adapter.place_order.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_insufficient_permission_level_rejected(self):
+        """[A-H12] Identity below DEMO_OPERATOR is rejected in DEMO."""
+        adapter = _make_adapter(mode="DEMO")
+        engine = _make_engine(adapter=adapter)
+
+        # VIEWER level (0) < DEMO_OPERATOR (2)
+        viewer = Identity(
+            identity_id="viewer-user",
+            identity_type="HUMAN",
+            role=Role.VIEWER,
+            allowed_environments=("DEMO",),
+        )
+
+        result = await engine.execute_order(
+            market_id="BTC-USDT",
+            side="BUY",
+            quantity=Decimal("0.01"),
+            price=Decimal("50000"),
+            identity=viewer,
+        )
+
+        assert result.success is False
+        assert "Authorization denied" in (result.error_message or "")
+        assert "Insufficient permission level" in (result.error_message or "")
+        adapter.place_order.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_valid_demo_operator_identity_executes(self):
+        """[A-H12] A valid DEMO_OPERATOR identity can execute in DEMO."""
+        adapter = _make_adapter(mode="DEMO")
+        engine = _make_engine(adapter=adapter)
+
+        result = await engine.execute_order(
+            market_id="BTC-USDT",
+            side="BUY",
+            quantity=Decimal("0.01"),
+            price=Decimal("50000"),
+            identity=DEMO_IDENTITY,
+        )
+
+        assert result.success is True
+        adapter.place_order.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_system_identity_can_execute_in_both_environments(self):
+        """[A-H12] SYSTEM identity (DEMO+LIVE) can execute in DEMO and LIVE."""
+        from trading_grid.application.services.authorization import SYSTEM_IDENTITY
+
+        for mode in ("DEMO", "LIVE"):
+            adapter = _make_adapter(mode=mode)
+            engine = _make_engine(adapter=adapter)
+
+            result = await engine.execute_order(
+                market_id="BTC-USDT",
+                side="BUY",
+                quantity=Decimal("0.01"),
+                price=Decimal("50000"),
+                identity=SYSTEM_IDENTITY,
+            )
+
+            assert result.success is True, f"SYSTEM identity failed in {mode}"
+            adapter.place_order.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_identity_metadata_is_stored_on_order(self):
+        """[A-H12] The caller identity is recorded in order metadata for audit."""
+        engine = _make_engine()
+
+        identity = Identity(
+            identity_id="audit-user",
+            identity_type="HUMAN",
+            role=Role.DEMO_OPERATOR,
+            allowed_environments=("DEMO",),
+            metadata={"source": "test-audit"},
+        )
+
+        result = await engine.execute_order(
+            market_id="BTC-USDT",
+            side="BUY",
+            quantity=Decimal("0.01"),
+            price=Decimal("50000"),
+            identity=identity,
+            metadata={"grid_level": 1},
+        )
+
+        order = engine.get_order(result.order_id)
+        assert order is not None
+        assert order.metadata == {"grid_level": 1}
 
 
 class TestExecuteOrderTenantLimits:
@@ -381,6 +542,7 @@ class TestExecuteOrderTenantLimits:
             price=Decimal("50000"),
             user_id="usr_1",
             active_grid_count=2,
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         tenant_limits.check_can_trade.assert_called_once_with(
@@ -400,6 +562,7 @@ class TestExecuteOrderTenantLimits:
             side="BUY",
             quantity=Decimal("0.01"),
             price=Decimal("50000"),
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         tenant_limits.check_can_trade.assert_not_called()
@@ -420,6 +583,7 @@ class TestExecuteOrderTenantLimits:
                 side="BUY",
                 quantity=Decimal("0.01"),
                 price=Decimal("50000"),
+            identity=DEMO_IDENTITY,  # [A-H12] required
             )
 
         # Order still succeeds (soft enforcement)
@@ -451,6 +615,7 @@ class TestExecuteOrderTenantLimits:
             quantity=Decimal("0.01"),
             price=Decimal("50000"),
             user_id="usr_1",
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is False
@@ -478,6 +643,7 @@ class TestExecuteOrderTenantLimits:
             quantity=Decimal("0.01"),
             price=Decimal("50000"),
             user_id="usr_1",
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is False
@@ -506,6 +672,7 @@ class TestExecuteOrderTenantLimits:
             price=Decimal("50000"),
             user_id="usr_1",
             active_grid_count=5,
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is False
@@ -530,6 +697,7 @@ class TestExecuteOrderTenantLimits:
             quantity=Decimal("0.01"),
             price=Decimal("50000"),
             user_id="usr_1",
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         # Both are called, but check_can_trade must be called first
@@ -552,6 +720,7 @@ class TestExecuteOrderTenantLimits:
             quantity=Decimal("0.01"),
             price=Decimal("50000"),
             user_id="usr_1",
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         tenant_limits.check_can_trade.assert_called_once()
@@ -576,6 +745,7 @@ class TestExecuteOrderTenantLimits:
             user_id="usr_1",
             active_grid_count=1,
             skip_rate_limit=True,
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is True
@@ -602,6 +772,7 @@ class TestExecuteOrderTenantLimits:
             price=Decimal("50000"),
             user_id="usr_1",
             skip_rate_limit=True,
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is False
@@ -1148,6 +1319,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key=key,
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
         assert result1.success is True
 
@@ -1157,6 +1329,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key=key,
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
         assert result2.success is True
         assert result2.order_id == result1.order_id
@@ -1176,6 +1349,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key="GRID-1:0:3:BUY:100",
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
         result2 = await engine.execute_order(
             market_id="BTC-USDT",
@@ -1183,6 +1357,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key="GRID-1:0:4:BUY:100",
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result1.success is True
@@ -1201,12 +1376,14 @@ class TestIdempotency:
             side="BUY",
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
         result2 = await engine.execute_order(
             market_id="BTC-USDT",
             side="BUY",
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result1.success is True
@@ -1227,6 +1404,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key=key,
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         result2 = await engine.execute_order(
@@ -1235,6 +1413,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key=key,
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result2.exchange_order_id == result1.exchange_order_id
@@ -1255,6 +1434,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key=key,
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
         assert result1.success is False
 
@@ -1266,6 +1446,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key=key,
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
         assert result2.success is False
         # Both attempts should have been made (2 orders tracked)
@@ -1283,6 +1464,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key=key,
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         order = engine.get_order(result.order_id)
@@ -1307,6 +1489,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key=key,
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         found = engine._find_order_by_idempotency_key(key)
@@ -1326,6 +1509,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key=key,
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         # Manually set status to FILLED to simulate exchange fill
@@ -1338,6 +1522,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key=key,
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result2.success is True
@@ -1357,6 +1542,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key=key,
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         order = engine.get_order(result1.order_id)
@@ -1368,6 +1554,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key=key,
+        identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result2.success is True

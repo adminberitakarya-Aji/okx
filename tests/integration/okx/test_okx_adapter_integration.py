@@ -75,8 +75,8 @@ class TestOKXAdapterIntegration:
         assert market.tick_size == Decimal("0.1")
         assert market.is_active is True
 
-    async def test_get_ticker_returns_raw_dict(self):
-        """get_ticker returns the raw ticker dict from OKX."""
+    async def test_get_ticker_returns_domain_model(self):
+        """get_ticker returns a domain Ticker model (not a raw dict) per [D-M8]."""
         adapter = _make_adapter()
         adapter._rest.get_ticker.return_value = {
             "instId": "BTC-USDT",
@@ -88,8 +88,11 @@ class TestOKXAdapterIntegration:
 
         ticker = await adapter.get_ticker("BTC-USDT")
 
-        assert ticker["instId"] == "BTC-USDT"
-        assert ticker["last"] == "50000.00"
+        # [D-M8] Adapter returns a normalized Ticker domain model
+        assert ticker.market_id == "BTC-USDT"
+        assert ticker.last_price == Decimal("50000.00")
+        assert ticker.bid_price == Decimal("49999.00")
+        assert ticker.ask_price == Decimal("50001.00")
         adapter._rest.get_ticker.assert_called_once_with("BTC-USDT")
 
     async def test_get_orderbook_returns_domain_model(self):

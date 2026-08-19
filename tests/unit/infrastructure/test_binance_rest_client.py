@@ -12,7 +12,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
-import tenacity
 
 from trading_grid.config.settings import BinanceSettings
 from trading_grid.infrastructure.binance.rest_client import BinanceAPIError, BinanceRestClient
@@ -124,6 +123,31 @@ class TestRequestInternals:
             assert "signature" in params
             assert params["recvWindow"] == "5000"
             # Auth header present
+            assert call_kwargs["headers"]["X-MBX-APIKEY"] == "test-key"
+
+    async def test_request_signed_uses_custom_recv_window(self):
+        """[NEW-M-2] recvWindow must come from settings, not hardcoded."""
+        settings = BinanceSettings(
+            api_key="test-key",
+            api_secret="test-secret",
+            testnet_mode=True,
+            recv_window_ms=10000,
+            _env_file=None,
+        )
+        client = BinanceRestClient(settings)
+        mock_resp = _mock_response({"balances": []})
+
+        with patch.object(client, "_ensure_client", new_callable=AsyncMock) as mock_ensure:
+            mock_http = AsyncMock()
+            mock_http.request.return_value = mock_resp
+            mock_ensure.return_value = mock_http
+
+            await client._request("GET", "/api/v3/account", signed=True)
+
+            call_kwargs = mock_http.request.call_args[1]
+            params = call_kwargs["params"]
+            assert params["recvWindow"] == "10000"
+            assert "signature" in params
             assert call_kwargs["headers"]["X-MBX-APIKEY"] == "test-key"
 
     async def test_request_api_error_with_json_body(self):

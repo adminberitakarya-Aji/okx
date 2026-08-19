@@ -10,8 +10,9 @@ Demo environment is clearly labeled in all responses.
 from datetime import UTC, datetime
 
 import structlog
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from trading_grid.api.routes.dependencies import get_current_identity
 from trading_grid.api.schemas.demo import (
     AlertListResponse,
     AlertResponse,
@@ -30,6 +31,7 @@ from trading_grid.api.schemas.demo import (
     MonitoringDashboardResponse,
     MonitoringSummaryResponse,
 )
+from trading_grid.application.services.authorization import Identity
 from trading_grid.application.services.demo_trading import (
     DemoGridSession,
     DemoTradingError,
@@ -141,13 +143,28 @@ async def get_demo_session(session_id: str) -> DemoSessionResponse:
 
 
 @router.post("/sessions/{session_id}/start", response_model=DemoSessionResponse)
-async def start_demo_session(session_id: str) -> DemoSessionResponse:
-    """Start a demo grid session."""
+async def start_demo_session(
+    session_id: str,
+    identity: Identity = Depends(get_current_identity),  # [A-H11] require identity
+) -> DemoSessionResponse:
+    """Start a demo grid session.
+
+    [A-H11] Security: Requires authenticated identity. The service checks
+    session ownership — only the session owner (or SYSTEM identity) can start.
+    """
     service = get_demo_service()
 
     try:
-        session = await service.start_demo_grid(session_id)
+        session = await service.start_demo_grid(session_id, identity=identity)
         return _session_to_response(session)
+    except PermissionError as e:
+        logger.warning(
+            "unauthorized_demo_session_start",
+            session_id=session_id,
+            identity_id=identity.identity_id,
+            error=str(e),
+        )
+        raise HTTPException(status_code=403, detail=str(e)) from e
     except DemoTradingError as e:
         raise HTTPException(status_code=400, detail=e.message) from e
 
@@ -226,8 +243,16 @@ async def emergency_stop_all_demo_sessions(request: EmergencyStopRequest) -> Eme
 
 
 @router.post("/sessions/{session_id}/orders", response_model=DemoOrderResponse)
-async def execute_demo_order(session_id: str, request: DemoOrderRequest) -> DemoOrderResponse:
-    """Execute an order in a demo session."""
+async def execute_demo_order(
+    session_id: str,
+    request: DemoOrderRequest,
+    identity: Identity = Depends(get_current_identity),  # [A-H12] require identity
+) -> DemoOrderResponse:
+    """Execute an order in a demo session.
+
+    [A-H12] Security: Requires authenticated identity. Passed through to
+    execute_order for RBAC authorization.
+    """
     service = get_demo_service()
 
     try:
@@ -238,6 +263,7 @@ async def execute_demo_order(session_id: str, request: DemoOrderRequest) -> Demo
             quantity=request.quantity,
             price=request.price,
             metadata=request.metadata,
+            identity=identity,  # [A-H12] Pass through authenticated identity
         )
 
         return DemoOrderResponse(

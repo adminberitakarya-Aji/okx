@@ -7,7 +7,7 @@ sub-modules:
 - _state.py       — Global state, service container helpers
 - _auth.py        — Authorization checks
 - commands.py     — /command handlers
-- callbacks.py    — Inline keyboard callback handlers
+- callbacks/      — Inline keyboard callback handlers (8 sub-modules) [TD-1]
 - registration.py — Handler registration with the Dispatcher
 
 This __init__.py re-exports the public API so that existing imports

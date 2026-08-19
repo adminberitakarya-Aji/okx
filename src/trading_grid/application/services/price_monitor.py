@@ -24,6 +24,7 @@ from typing import Any
 
 import structlog
 
+from trading_grid.application.services.authorization import SYSTEM_IDENTITY
 from trading_grid.application.services.execution_engine import ExecutionEngine
 from trading_grid.application.services.grid_engine import GridEngine, GridRuntime
 from trading_grid.domain.exchange.interface import ExchangeAdapter
@@ -271,8 +272,31 @@ class PriceMonitorService:
             )
 
     def get_last_price(self, market_id: MarketId) -> Price | None:
-        """Get the latest recorded price for a market."""
+        """
+        Get the latest recorded price for a market.
+
+        [A-M9-REV] Phase 10.4: Public method to access last known prices.
+        Callers should use this instead of accessing _market_last_prices directly.
+
+        Args:
+            market_id: Market identifier
+
+        Returns:
+            Last known price or None if no price recorded
+        """
         return self._market_last_prices.get(market_id)
+
+    def get_all_last_prices(self) -> dict[MarketId, Price]:
+        """
+        Get all last known prices.
+
+        [A-M9-REV] Phase 10.4: Public method to access all last known prices.
+        Returns a copy to prevent external mutation.
+
+        Returns:
+            Dictionary mapping market IDs to last known prices
+        """
+        return dict(self._market_last_prices)
 
     def _normalize_market_id(self, raw_id: str) -> MarketId:
         """
@@ -537,6 +561,7 @@ class PriceMonitorService:
             reference_price=reference_price,
             user_id=grid.user_id,
             idempotency_key=idempotency_key,
+            identity=SYSTEM_IDENTITY,  # [A-H12] System-triggered order — no user bypass
             skip_rate_limit=True,  # [A-M1] Autonomous grid triggers bypass interactive rate limit
         )
 

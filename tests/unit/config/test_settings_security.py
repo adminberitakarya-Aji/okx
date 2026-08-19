@@ -8,11 +8,14 @@ Verifies:
 4. Secrets are never exposed (SecretStr)
 5. Fail-fast: is_configured checks work for all exchanges
 6. Fail-fast: live mode in production without credentials raises ValueError
+7. [NEW-CR-2] Production secret_key must be explicit and >= 32 chars
 """
 
 import logging
+import secrets
 
 import pytest
+from pydantic import SecretStr, ValidationError
 
 from trading_grid.config.settings import (
     AppSettings,
@@ -34,7 +37,14 @@ def make_settings(
     bybit_testnet: bool = True,
 ) -> Settings:
     """Build a Settings instance for testing."""
-    app = AppSettings(env=env, _env_file=None)  # type: ignore[arg-type]
+    # [NEW-CR-2] Production requires a strong secret_key; tests must pass one.
+    secret_key = (
+        secrets.token_urlsafe(64) if env == "production" else None
+    )
+    app_kwargs: dict = {"env": env, "_env_file": None}
+    if secret_key:
+        app_kwargs["secret_key"] = secret_key
+    app = AppSettings(**app_kwargs)  # type: ignore[arg-type]
     okx = (
         OKXSettings(
             api_key="k",
@@ -271,7 +281,11 @@ class TestTelegramOpenAccessProductionValidator:
 
     def test_open_access_in_production_raises(self) -> None:
         """TELEGRAM_OPEN_ACCESS=True in production raises ValueError."""
-        app = AppSettings(env="production", _env_file=None)
+        # [NEW-CR-2] Provide strong secret_key so the AppSettings validator
+        # does not pre-empt the open_access check we are testing.
+        app = AppSettings(
+            env="production", secret_key=secrets.token_urlsafe(64), _env_file=None
+        )
         telegram = TelegramSettings(open_access=True, _env_file=None)
         with pytest.raises(ValueError, match="TELEGRAM_OPEN_ACCESS cannot be True in production"):
             Settings(app=app, telegram=telegram, _env_file=None)
@@ -282,3 +296,102 @@ class TestTelegramOpenAccessProductionValidator:
         telegram = TelegramSettings(open_access=True, _env_file=None)
         settings = Settings(app=app, telegram=telegram, _env_file=None)
         assert settings.telegram.open_access is True
+
+
+# ===========================================================================
+# [NEW-CR-2] secret_key Production Validation
+# ===========================================================================
+
+
+class TestSecretKeyProductionValidation:
+    """[NEW-CR-2] Verify AppSettings.secret_key validation in production."""
+
+    def test_production_with_default_secret_key_raises(self) -> None:
+        """Production with default dev secret_key must raise ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
+            AppSettings(
+                env="production",
+                secret_key="dev-jwt-secret-key-change-in-production",
+                _env_file=None,
+            )
+        # pydantic wraps ValueError in ValidationError
+        assert "APP_SECRET_KEY" in str(exc_info.value)
+
+    def test_production_with_empty_secret_key_raises(self) -> None:
+        """Production with empty secret_key must raise ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
+            AppSettings(env="production", secret_key="", _env_file=None)
+        assert "APP_SECRET_KEY" in str(exc_info.value)
+
+    def test_production_with_change_me_secret_key_raises(self) -> None:
+        """Production with 'change-me' placeholder must raise ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
+            AppSettings(env="production", secret_key="change-me", _env_file=None)
+        assert "APP_SECRET_KEY" in str(exc_info.value)
+
+    def test_production_with_short_secret_key_raises(self) -> None:
+        """Secret key shorter than 32 chars must raise."""
+        with pytest.raises(ValidationError) as exc_info:
+            AppSettings(env="production", secret_key="too-short-key", _env_file=None)
+        assert "at least 32 characters" in str(exc_info.value)
+
+    def test_production_with_exactly_31_chars_raises(self) -> None:
+        """A 31-character secret (one short) must raise."""
+        with pytest.raises(ValidationError) as exc_info:
+            AppSettings(env="production", secret_key="a" * 31, _env_file=None)
+        assert "at least 32 characters" in str(exc_info.value)
+
+    def test_production_with_exactly_32_chars_succeeds(self) -> None:
+        """A 32-character secret is the minimum and must succeed."""
+        secret = "a" * 32
+        app = AppSettings(env="production", secret_key=secret, _env_file=None)
+        assert app.secret_key.get_secret_value() == secret
+
+    def test_production_with_strong_secret_key_succeeds(self) -> None:
+        """Strong random secret key in production must succeed."""
+        strong = secrets.token_urlsafe(64)
+        app = AppSettings(env="production", secret_key=strong, _env_file=None)
+        assert app.secret_key.get_secret_value() == strong
+
+    def test_production_with_secretstr_object_succeeds(self) -> None:
+        """SecretStr input is also accepted in production."""
+        strong = secrets.token_urlsafe(64)
+        app = AppSettings(env="production", secret_key=SecretStr(strong), _env_file=None)
+        assert app.secret_key.get_secret_value() == strong
+
+    def test_development_with_default_secret_key_succeeds(self) -> None:
+        """Default dev secret key is OK for development."""
+        app = AppSettings(env="development", _env_file=None)
+        assert app.secret_key.get_secret_value() == "dev-jwt-secret-key-change-in-production"
+
+    def test_development_with_short_secret_key_succeeds(self) -> None:
+        """No length check in development — any key accepted."""
+        app = AppSettings(env="development", secret_key="x", _env_file=None)
+        assert app.secret_key.get_secret_value() == "x"
+
+    def test_staging_with_default_secret_key_succeeds(self) -> None:
+        """Default secret is allowed in staging (only production is strict)."""
+        app = AppSettings(
+            env="staging",
+            secret_key="dev-jwt-secret-key-change-in-production",
+            _env_file=None,
+        )
+        assert app.secret_key.get_secret_value() == "dev-jwt-secret-key-change-in-production"
+
+    def test_production_secret_key_error_mentions_generation_command(self) -> None:
+        """The error message should guide the user to generate a strong key."""
+        with pytest.raises(ValidationError) as exc_info:
+            AppSettings(
+                env="production",
+                secret_key="dev-jwt-secret-key-change-in-production",
+                _env_file=None,
+            )
+        msg = str(exc_info.value)
+        assert "secrets.token_urlsafe" in msg
+        assert "Generate" in msg
+
+    def test_production_secret_key_length_error_includes_actual_length(self) -> None:
+        """The error message should report the actual length for debugging."""
+        with pytest.raises(ValidationError) as exc_info:
+            AppSettings(env="production", secret_key="short", _env_file=None)
+        assert "Current length: 5" in str(exc_info.value)

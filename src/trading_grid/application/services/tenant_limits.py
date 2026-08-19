@@ -18,6 +18,11 @@ Design decisions:
 Security rules:
 - Rate limit decisions are audit-logged when they block an action
 - Emergency stop is always allowed (never rate-limited)
+
+[A-M1-REV] Phase 10.3: Tenant Limits Auto-Fetch.
+- GridEngine can be injected for auto-fetching active grid count
+- `check_can_trade` auto-fetches count if not provided
+- Eliminates manual `active_grid_count` parameter passing
 """
 
 from __future__ import annotations
@@ -32,6 +37,7 @@ import structlog
 from trading_grid.domain.risk.models import RiskLimits
 
 if TYPE_CHECKING:
+    from trading_grid.application.services.grid_engine import GridEngine
     from trading_grid.config.settings import Settings
 
 logger = structlog.get_logger()
@@ -77,35 +83,62 @@ class TenantLimitsService:
     """
     Per-user limits enforcement service.
 
+    [A-M1-REV] Phase 10.3: GridEngine can be injected for auto-fetching
+    active grid count. This eliminates manual `active_grid_count` parameter
+    passing and reduces the risk of stale counts.
+
     Usage:
+        # Without GridEngine (manual count):
         service = TenantLimitsService(settings)
+        service.check_can_trade("usr_1", active_grid_count=2)
 
-        # Check rate limit before action
-        service.check_rate_limit("usr_1")
-
-        # Check grid capacity
-        service.check_grid_capacity("usr_1", active_grid_count=2)
-
-        # Emergency stop
-        service.emergency_stop_user("usr_1", reason="Max drawdown")
+        # With GridEngine (auto-fetch):
+        service = TenantLimitsService(settings, grid_engine=engine)
+        service.check_can_trade("usr_1")  # count auto-fetched
     """
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        grid_engine: GridEngine | None = None,
+    ) -> None:
         """
         Initialize tenant limits service.
 
         Args:
             settings: Application settings (uses risk defaults)
+            grid_engine: [A-M1-REV] Optional GridEngine for auto-fetching
+                active grid count. If provided, `check_can_trade` will
+                auto-fetch the count when not explicitly provided.
         """
         self._settings = settings
+        self._grid_engine = grid_engine
         # Per-user overrides: user_id -> partial overrides dict
         self._user_overrides: dict[str, dict[str, object]] = {}
         # Rate limiter: user_id -> list of request timestamps
         self._rate_windows: dict[str, list[float]] = {}
         # Emergency stop flags: user_id -> reason
         self._emergency_stops: dict[str, str] = {}
-        # Active grid counts: user_id -> count
+        # Active grid counts: user_id -> count (fallback when no GridEngine)
         self._active_grids: dict[str, int] = {}
+
+    @property
+    def grid_engine(self) -> GridEngine | None:
+        """[A-M1-REV] Get the injected GridEngine (if any)."""
+        return self._grid_engine
+
+    def set_grid_engine(self, grid_engine: GridEngine) -> None:
+        """
+        [A-M1-REV] Set the GridEngine for auto-fetching.
+
+        Useful for late wiring when GridEngine is created after
+        TenantLimitsService.
+
+        Args:
+            grid_engine: GridEngine instance
+        """
+        self._grid_engine = grid_engine
+        logger.info("tenant_limits_grid_engine_set")
 
     def _default_limits(self) -> RiskLimits:
         """Build default RiskLimits from settings."""
@@ -280,8 +313,47 @@ class TenantLimitsService:
         self._active_grids[user_id] = max(0, count - 1)
 
     def get_active_grid_count(self, user_id: str) -> int:
-        """Get tracked active grid count for a user."""
+        """
+        Get active grid count for a user.
+
+        [A-M1-REV] If GridEngine is injected, auto-fetches the count from
+        the engine (counting grids owned by the user). Otherwise, falls back
+        to the internally tracked count.
+
+        Args:
+            user_id: User identifier
+
+        Returns:
+            Number of active grids for the user
+        """
+        if self._grid_engine is not None:
+            # Auto-fetch from GridEngine
+            return self._fetch_grid_count_from_engine(user_id)
         return self._active_grids.get(user_id, 0)
+
+    def _fetch_grid_count_from_engine(self, user_id: str) -> int:
+        """
+        [A-M1-REV] Fetch active grid count from GridEngine.
+
+        Counts grids where user_id matches. Grids with user_id=None
+        (system grids) are not counted toward user limits.
+
+        Args:
+            user_id: User identifier
+
+        Returns:
+            Number of active grids owned by the user
+        """
+        if self._grid_engine is None:
+            return 0
+
+        active_grids = self._grid_engine.get_active_grids()
+        count = sum(
+            1
+            for grid in active_grids
+            if getattr(grid, "user_id", None) == user_id
+        )
+        return count
 
     # =========================================================================
     # EMERGENCY STOP
@@ -378,7 +450,7 @@ class TenantLimitsService:
     def check_can_trade(
         self,
         user_id: str,
-        active_grid_count: int = 0,
+        active_grid_count: int | None = None,
         *,
         skip_rate_limit: bool = False,
         now: float | None = None,
@@ -391,9 +463,14 @@ class TenantLimitsService:
         2. Rate limit (unless skipped, e.g., for emergency operations)
         3. Grid capacity
 
+        [A-M1-REV] If `active_grid_count` is not provided and GridEngine is
+        injected, the count is auto-fetched from the engine. This eliminates
+        the need for callers to manually track and pass the count.
+
         Args:
             user_id: User identifier
-            active_grid_count: Current active grid count
+            active_grid_count: Current active grid count. If None, auto-fetched
+                from GridEngine (if injected) or defaults to 0.
             skip_rate_limit: Skip rate limit check (for emergency ops)
             now: Injectable timestamp for testing
 
@@ -406,6 +483,10 @@ class TenantLimitsService:
             MaxGridsExceededError: If grid capacity exceeded
         """
         self.check_can_place_order(user_id, skip_rate_limit=skip_rate_limit, now=now)
+
+        # [A-M1-REV] Auto-fetch count if not provided
+        if active_grid_count is None:
+            active_grid_count = self.get_active_grid_count(user_id)
 
         self.check_grid_capacity(user_id, active_grid_count)
 

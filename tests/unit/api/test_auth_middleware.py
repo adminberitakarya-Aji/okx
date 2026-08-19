@@ -23,11 +23,20 @@ from trading_grid.config.settings import AppSettings, Environment, Settings, Tel
 
 
 def _make_settings(env: Environment, debug: bool, dev_auth_enabled: bool) -> Settings:
-    """Build a Settings object with explicit security flags (no env file)."""
+    """Build a Settings object with explicit security flags (no env file).
+
+    [Phase 8.2] Production settings require a strong secret key (32+ chars).
+    """
+    import secrets
+
+    # Production requires a strong secret key (Phase 8.2 validation)
+    secret_key = secrets.token_urlsafe(64) if env == Environment.PRODUCTION else None
+
     app = AppSettings(
         env=env,
         debug=debug,
         dev_auth_enabled=dev_auth_enabled,
+        **({"secret_key": secret_key} if secret_key else {}),
         _env_file=None,
     )
     telegram = TelegramSettings(open_access=False, _env_file=None)

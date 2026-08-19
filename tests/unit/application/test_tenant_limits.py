@@ -304,3 +304,117 @@ class TestConcurrentTenantLimits:
         with pytest.raises(UserEmergencyStoppedError, match="Market crash detected"):
             service.check_can_trade("usr_1", active_grid_count=0, now=0.5)
 
+
+class TestGridEngineAutoFetch:
+    """[A-M1-REV] Tests for GridEngine auto-fetch (Phase 10.3)."""
+
+    def _make_mock_grid(self, user_id: str | None):
+        """Create a mock grid runtime."""
+        from unittest.mock import MagicMock
+
+        grid = MagicMock()
+        grid.user_id = user_id
+        return grid
+
+    def _make_mock_engine(self, grids: list):
+        """Create a mock GridEngine with given grids."""
+        from unittest.mock import MagicMock
+
+        engine = MagicMock()
+        engine.get_active_grids.return_value = grids
+        return engine
+
+    def test_constructor_accepts_grid_engine(self, settings: Settings) -> None:
+        """TenantLimitsService accepts grid_engine parameter."""
+        engine = self._make_mock_engine([])
+        service = TenantLimitsService(settings, grid_engine=engine)
+        assert service.grid_engine is engine
+
+    def test_constructor_without_grid_engine(self, settings: Settings) -> None:
+        """TenantLimitsService works without grid_engine."""
+        service = TenantLimitsService(settings)
+        assert service.grid_engine is None
+
+    def test_set_grid_engine(self, settings: Settings) -> None:
+        """set_grid_engine allows late wiring."""
+        service = TenantLimitsService(settings)
+        assert service.grid_engine is None
+
+        engine = self._make_mock_engine([])
+        service.set_grid_engine(engine)
+        assert service.grid_engine is engine
+
+    def test_get_active_grid_count_from_engine(self, settings: Settings) -> None:
+        """get_active_grid_count fetches from GridEngine when injected."""
+        grids = [
+            self._make_mock_grid("usr_1"),
+            self._make_mock_grid("usr_1"),
+            self._make_mock_grid("usr_2"),
+            self._make_mock_grid(None),  # system grid
+        ]
+        engine = self._make_mock_engine(grids)
+        service = TenantLimitsService(settings, grid_engine=engine)
+
+        assert service.get_active_grid_count("usr_1") == 2
+        assert service.get_active_grid_count("usr_2") == 1
+        assert service.get_active_grid_count("usr_3") == 0
+
+    def test_get_active_grid_count_fallback_without_engine(
+        self, settings: Settings
+    ) -> None:
+        """get_active_grid_count uses internal tracking without GridEngine."""
+        service = TenantLimitsService(settings)
+
+        service.register_grid_started("usr_1")
+        service.register_grid_started("usr_1")
+        assert service.get_active_grid_count("usr_1") == 2
+
+    def test_check_can_trade_auto_fetches_count(self, settings: Settings) -> None:
+        """check_can_trade auto-fetches count when not provided."""
+        grids = [
+            self._make_mock_grid("usr_1"),
+            self._make_mock_grid("usr_1"),
+        ]
+        engine = self._make_mock_engine(grids)
+        service = TenantLimitsService(settings, grid_engine=engine)
+
+        # Should pass (2 grids < default max)
+        result = service.check_can_trade("usr_1", now=0.0)
+        assert result.user_id == "usr_1"
+
+    def test_check_can_trade_auto_fetch_enforces_limit(self, settings: Settings) -> None:
+        """check_can_trade with auto-fetch enforces max grid limit."""
+        # Create grids equal to max_concurrent_grids (default from settings)
+        max_grids = settings.risk.max_concurrent_grids
+        grids = [self._make_mock_grid("usr_1") for _ in range(max_grids)]
+        engine = self._make_mock_engine(grids)
+        service = TenantLimitsService(settings, grid_engine=engine)
+
+        with pytest.raises(MaxGridsExceededError):
+            service.check_can_trade("usr_1", now=0.0)
+
+    def test_check_can_trade_explicit_count_overrides_auto_fetch(
+        self, settings: Settings
+    ) -> None:
+        """Explicit active_grid_count takes precedence over auto-fetch."""
+        grids = [self._make_mock_grid("usr_1")]  # 1 grid in engine
+        engine = self._make_mock_engine(grids)
+        service = TenantLimitsService(settings, grid_engine=engine)
+
+        # Explicit count of 0 should pass even though engine has 1 grid
+        result = service.check_can_trade("usr_1", active_grid_count=0, now=0.0)
+        assert result.user_id == "usr_1"
+
+    def test_system_grids_not_counted_toward_user_limits(self, settings: Settings) -> None:
+        """System grids (user_id=None) don't count toward user limits."""
+        grids = [
+            self._make_mock_grid(None),  # system grid
+            self._make_mock_grid(None),  # system grid
+            self._make_mock_grid("usr_1"),  # user grid
+        ]
+        engine = self._make_mock_engine(grids)
+        service = TenantLimitsService(settings, grid_engine=engine)
+
+        # usr_1 only has 1 grid (system grids not counted)
+        assert service.get_active_grid_count("usr_1") == 1
+

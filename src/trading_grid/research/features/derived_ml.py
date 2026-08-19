@@ -38,6 +38,9 @@ if TYPE_CHECKING:
 logger = structlog.get_logger()
 
 # Feature layer version
+# [TD-7] Default version — can be overridden via RESEARCH_DERIVED_ML_VERSION
+# environment variable (see config/settings.py ResearchSettings.derived_ml_version).
+# The DerivedMLExtractor accepts feature_version as a constructor parameter.
 DERIVED_ML_VERSION = "fml-v001"
 
 

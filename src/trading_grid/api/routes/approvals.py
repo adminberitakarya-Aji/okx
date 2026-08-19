@@ -4,15 +4,18 @@ Approvals API routes.
 Endpoints for approval request management (list, detail, approve, reject).
 
 Authorization: LEVEL 3+ (Approve/Reject)
+
+[I-C4] Security: All approval actions require authenticated identity.
+The actor is derived from the authenticated identity, NOT from request body.
 """
 
 from datetime import UTC, datetime
 from typing import cast
 
 import structlog
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 
-from trading_grid.api.routes.dependencies import get_default_container
+from trading_grid.api.routes.dependencies import get_current_identity, get_default_container
 from trading_grid.api.schemas.approvals import (
     ApprovalActionRequest,
     ApprovalActionResponse,
@@ -21,7 +24,7 @@ from trading_grid.api.schemas.approvals import (
     ApprovalType,
 )
 from trading_grid.application.services.approval import ApprovalError, ApprovalRequest
-from trading_grid.application.services.authorization import PermissionLevel
+from trading_grid.application.services.authorization import Identity, PermissionLevel
 
 logger = structlog.get_logger()
 
@@ -107,21 +110,33 @@ async def get_approval(approval_id: str) -> ApprovalResponse:
 
 @router.post("/{approval_id}/approve", response_model=ApprovalActionResponse)
 async def approve_approval(
-    approval_id: str, request: ApprovalActionRequest, http_request: Request
+    approval_id: str,
+    request: ApprovalActionRequest,
+    identity: Identity = Depends(get_current_identity),
 ) -> ApprovalActionResponse:
     """
     Approve a pending approval request.
 
     Authorization: LEVEL 3+ (Live Trading Approval)
+
+    [I-C4] Security: Actor is derived from authenticated identity only.
+    The request.actor field is ignored to prevent spoofing.
     """
-    identity = getattr(http_request.state, "identity", None)
-    if identity is not None and identity.permission_level < PermissionLevel.LIVE_OPERATOR:
+    if identity.permission_level < PermissionLevel.LIVE_OPERATOR:
+        logger.warning(
+            "approval_insufficient_permission",
+            approval_id=approval_id,
+            identity_id=identity.identity_id,
+            permission_level=identity.permission_level,
+            required_level=PermissionLevel.LIVE_OPERATOR,
+        )
         raise HTTPException(
             status_code=403,
             detail="Forbidden: LIVE_OPERATOR (Level 3+) role required to approve requests",
         )
 
-    actor = identity.identity_id if identity is not None else request.actor
+    # [I-C4] Actor is ALWAYS from authenticated identity, never from request body
+    actor = identity.identity_id
 
     container = get_default_container()
     service = container.approval_service
@@ -150,21 +165,33 @@ async def approve_approval(
 
 @router.post("/{approval_id}/reject", response_model=ApprovalActionResponse)
 async def reject_approval(
-    approval_id: str, request: ApprovalActionRequest, http_request: Request
+    approval_id: str,
+    request: ApprovalActionRequest,
+    identity: Identity = Depends(get_current_identity),
 ) -> ApprovalActionResponse:
     """
     Reject a pending approval request.
 
     Authorization: LEVEL 3+ (Live Trading Approval)
+
+    [I-C4] Security: Actor is derived from authenticated identity only.
+    The request.actor field is ignored to prevent spoofing.
     """
-    identity = getattr(http_request.state, "identity", None)
-    if identity is not None and identity.permission_level < PermissionLevel.LIVE_OPERATOR:
+    if identity.permission_level < PermissionLevel.LIVE_OPERATOR:
+        logger.warning(
+            "approval_insufficient_permission",
+            approval_id=approval_id,
+            identity_id=identity.identity_id,
+            permission_level=identity.permission_level,
+            required_level=PermissionLevel.LIVE_OPERATOR,
+        )
         raise HTTPException(
             status_code=403,
             detail="Forbidden: LIVE_OPERATOR (Level 3+) role required to reject requests",
         )
 
-    actor = identity.identity_id if identity is not None else request.actor
+    # [I-C4] Actor is ALWAYS from authenticated identity, never from request body
+    actor = identity.identity_id
 
     container = get_default_container()
     service = container.approval_service

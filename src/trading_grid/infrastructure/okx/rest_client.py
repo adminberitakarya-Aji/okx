@@ -19,6 +19,7 @@ import hmac
 import json
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlencode
 
 import httpx
 import structlog
@@ -143,9 +144,13 @@ class OKXRestClient:
         client = await self._ensure_client()
 
         # Build query string for signing
+        # NOTE: Params are sorted + url-encoded to match OKX signing spec.
+        # Values with special chars (+, &, =) must be encoded or the
+        # signature will mismatch the server-side verification.
         query_string = ""
         if params:
-            query_string = "?" + "&".join(f"{k}={v}" for k, v in params.items())
+            sorted_params = sorted(params.items())
+            query_string = "?" + urlencode(sorted_params)
         full_path = path + query_string
 
         # Prepare body

@@ -574,8 +574,10 @@ class MarketStateFeatureExtractor:
         # Daily structure
         if daily_candles:
             current = daily_candles[-1]
-            # Daily candle closes at end of day (23:59 UTC)
-            is_closed = current.timestamp.date() < observation_time.date()
+            # [TD-6] Daily candle closes at end of day (23:59 UTC).
+            # Add 1-hour buffer: candle is only considered closed after 01:00 UTC
+            # to account for exchange delays in finalizing the previous day's candle.
+            is_closed = self._is_daily_candle_closed(current.timestamp, observation_time)
             features.daily = CandleStructure(
                 open=current.open,
                 high=current.high,
@@ -597,6 +599,32 @@ class MarketStateFeatureExtractor:
         candle_iso = candle_time.isocalendar()
         obs_iso = observation_time.isocalendar()
         return (candle_iso.year, candle_iso.week) < (obs_iso.year, obs_iso.week)
+
+    def _is_daily_candle_closed(self, candle_time: datetime, observation_time: datetime) -> bool:
+        """Check if daily candle is closed at observation time.
+
+        [TD-6] Adds a 1-hour buffer after midnight UTC to account for exchange
+        delays in finalizing the previous day's candle. A candle is only
+        considered closed after 01:00 UTC on the following day.
+
+        Args:
+            candle_time: Timestamp of the candle (start of day)
+            observation_time: Current observation time
+
+        Returns:
+            True if the candle is definitively closed, False otherwise
+        """
+        from datetime import timedelta
+
+        # If candle is from a previous day AND we're past 01:00 UTC, it's closed
+        if candle_time.date() < observation_time.date():
+            # Check if we're past the 1-hour buffer (01:00 UTC)
+            midnight = observation_time.replace(hour=0, minute=0, second=0, microsecond=0)
+            buffer_end = midnight + timedelta(hours=1)
+            return observation_time >= buffer_end
+
+        # Same day or future — not closed
+        return False
 
     def _extract_position_and_proximity(self, features: MarketStateFeatures) -> None:
         """Extract price position and proximity features (F-MKT-041 to F-MKT-049)."""

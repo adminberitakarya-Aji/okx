@@ -85,6 +85,45 @@ class TestBybitAdapterWebSocket:
             await adapter.start_private_ws()
             mock_ws.assert_called_once()
 
+    async def test_subscribe_market_ids_sends_correct_topics(self):
+        """[NEW-CR-1] subscribe_market_ids() must build tickers.<sym> and kline.60.<sym> topics."""
+        adapter = _make_adapter()
+        with patch("trading_grid.infrastructure.bybit.adapter.BybitWebSocketClient") as mock_ws_cls:
+            mock_ws = AsyncMock()
+            mock_ws_cls.return_value = mock_ws
+
+            await adapter.start_market_data_ws(market_ids=["BTC-USDT", "ETH-USDT"])
+
+            mock_ws.subscribe_many.assert_called_once()
+            topics = mock_ws.subscribe_many.call_args[0][0]
+            assert "tickers.BTCUSDT" in topics
+            assert "kline.60.BTCUSDT" in topics
+            assert "tickers.ETHUSDT" in topics
+            assert "kline.60.ETHUSDT" in topics
+            assert len(topics) == 4
+
+    async def test_subscribe_market_ids_without_ws_raises(self):
+        """subscribe_market_ids() without start_market_data_ws must raise."""
+        adapter = _make_adapter()
+        with pytest.raises(RuntimeError):
+            await adapter.subscribe_market_ids(["BTC-USDT"])
+
+    async def test_subscribe_private_channels(self):
+        """[NEW-CR-1] subscribe_private_channels() must send SUBSCRIBE."""
+        adapter = _make_adapter()
+        with patch("trading_grid.infrastructure.bybit.adapter.BybitWebSocketClient") as mock_ws_cls:
+            mock_ws = AsyncMock()
+            mock_ws_cls.return_value = mock_ws
+
+            await adapter.start_private_ws()
+            await adapter.subscribe_private_channels(["order", "position", "wallet"])
+
+            mock_ws.subscribe_many.assert_called_once()
+            topics = mock_ws.subscribe_many.call_args[0][0]
+            assert "order" in topics
+            assert "position" in topics
+            assert "wallet" in topics
+
     def test_on_order_update(self):
         adapter = _make_adapter()
         handler = MagicMock()

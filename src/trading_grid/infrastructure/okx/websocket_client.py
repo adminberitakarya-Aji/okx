@@ -23,6 +23,7 @@ import websockets
 from websockets.exceptions import ConnectionClosed
 
 from trading_grid.config.settings import OKXSettings
+from trading_grid.infrastructure._common.ws_backoff import ws_reconnect_delay
 
 logger = structlog.get_logger()
 
@@ -38,7 +39,9 @@ class OKXWebSocketClient:
     """
 
     PING_INTERVAL = 25  # seconds
-    RECONNECT_DELAY = 5  # seconds
+    # [NEW-M-3] Reconnect uses exponential backoff via ws_reconnect_delay.
+    # RECONNECT_DELAY kept for backward compatibility but no longer used directly.
+    RECONNECT_DELAY = 5  # seconds (legacy, replaced by exponential backoff)
 
     def __init__(self, settings: OKXSettings, private: bool = False) -> None:
         """
@@ -55,6 +58,13 @@ class OKXWebSocketClient:
         self._reconnect_task: asyncio.Task[None] | None = None
         self._message_handlers: list[Callable[[dict[str, Any]], None]] = []
         self._disconnect_handlers: list[Callable[[], None]] = []
+        # [NEW-CR-1] Track connection state and subscriptions for reconnect logic
+        self._connected: asyncio.Event = asyncio.Event()
+        self._subscribed_channels: list[dict[str, str]] = []
+        # [NEW-M-3] Track consecutive reconnect attempts for exponential backoff
+        self._reconnect_attempt = 0
+        # [NEW-M-5] Track in-flight async handler tasks to prevent GC (RUF006)
+        self._handler_tasks: set[asyncio.Task[Any]] = set()
 
     @property
     def ws_url(self) -> str:
@@ -81,6 +91,7 @@ class OKXWebSocketClient:
     async def connect(self) -> None:
         """Connect to WebSocket with iterative reconnect loop."""
         self._running = True
+        self._reconnect_attempt = 0
         while self._running:
             await self._connect()
 
@@ -90,20 +101,30 @@ class OKXWebSocketClient:
             logger.info("ws_connecting", url=self.ws_url, private=self._private)
             self._ws = await websockets.connect(self.ws_url)
             logger.info("ws_connected", private=self._private)
+            # [NEW-M-3] Reset attempt counter on successful connect
+            self._reconnect_attempt = 0
+            # [NEW-CR-1] Signal connection ready
+            self._connected.set()
 
             # Login for private channel
             if self._private:
                 await self._login()
 
+            # [NEW-CR-1] Re-subscribe channels after reconnect
+            if self._subscribed_channels:
+                await self._resubscribe_all()
+
             # Start message loop
             await self._message_loop()
         except ConnectionClosed as e:
             logger.warning("ws_connection_closed", code=e.code, reason=e.reason)
+            self._connected.clear()
             self._notify_disconnect()
             if self._running:
                 await self._schedule_reconnect()
         except Exception as e:
             logger.error("ws_error", error=str(e))
+            self._connected.clear()
             self._notify_disconnect()
             if self._running:
                 await self._schedule_reconnect()
@@ -191,10 +212,18 @@ class OKXWebSocketClient:
                 logger.error("ws_error_event", code=data.get("code"), msg=data.get("msg"))
                 return
 
-            # Dispatch to handlers
+            # [NEW-M-5] Dispatch to handlers — async handlers run as tasks,
+            # sync handlers run in executor to avoid blocking the event loop.
             for handler in self._message_handlers:
                 try:
-                    handler(data)
+                    if asyncio.iscoroutinefunction(handler):
+                        # RUF006: track task in set to prevent GC
+                        task = asyncio.create_task(handler(data))
+                        self._handler_tasks.add(task)
+                        task.add_done_callback(self._handler_tasks.discard)
+                    else:
+                        loop = asyncio.get_event_loop()
+                        await loop.run_in_executor(None, handler, data)
                 except Exception as e:
                     logger.error("ws_handler_error", error=str(e))
 
@@ -210,9 +239,15 @@ class OKXWebSocketClient:
                 logger.warning("ws_ping_failed", error=str(e))
 
     async def _schedule_reconnect(self) -> None:
-        """Schedule reconnection delay (reconnection loop handled by connect())."""
-        logger.info("ws_scheduling_reconnect", delay=self.RECONNECT_DELAY)
-        await asyncio.sleep(self.RECONNECT_DELAY)
+        """Schedule reconnection delay with exponential backoff + jitter."""
+        delay = ws_reconnect_delay(self._reconnect_attempt)
+        self._reconnect_attempt += 1
+        logger.info(
+            "ws_scheduling_reconnect",
+            delay=delay,
+            attempt=self._reconnect_attempt,
+        )
+        await asyncio.sleep(delay)
 
     def _notify_disconnect(self) -> None:
         """Notify disconnect handlers."""
@@ -222,40 +257,121 @@ class OKXWebSocketClient:
             except Exception as e:
                 logger.error("ws_disconnect_handler_error", error=str(e))
 
+    async def _wait_for_connected(self, timeout: float = 10.0) -> None:
+        """
+        [NEW-CR-1] Wait until WebSocket is connected.
+
+        Args:
+            timeout: Maximum seconds to wait
+
+        Raises:
+            asyncio.TimeoutError: If connection not established within timeout
+        """
+        try:
+            await asyncio.wait_for(self._connected.wait(), timeout=timeout)
+        except TimeoutError:
+            logger.error("ws_connect_timeout", timeout=timeout)
+            raise
+
+    async def _resubscribe_all(self) -> None:
+        """
+        [NEW-CR-1] Re-subscribe all tracked channels after reconnect.
+
+        Called automatically by _connect() when re-establishing connection.
+        """
+        if not self._subscribed_channels or self._ws is None:
+            return
+        msg = {"op": "subscribe", "args": list(self._subscribed_channels)}
+        await self._ws.send(json.dumps(msg))
+        logger.info(
+            "ws_resubscribed",
+            count=len(self._subscribed_channels),
+            private=self._private,
+        )
+
     async def subscribe(self, channel: str, inst_id: str | None = None) -> None:
         """
-        Subscribe to channel.
+        Subscribe to a single channel.
 
         Args:
             channel: Channel name (e.g., 'tickers', 'orders')
             inst_id: Instrument ID (if applicable)
+
+        Note:
+            For multiple channels at once, prefer subscribe_many().
+        """
+        arg: dict[str, str] = {"channel": channel}
+        if inst_id:
+            arg["instId"] = inst_id
+        await self.subscribe_many([arg])
+
+    async def subscribe_many(self, channels: list[dict[str, str]]) -> None:
+        """
+        [NEW-CR-1] Subscribe to multiple channels at once.
+
+        Args:
+            channels: List of channel configs, e.g.
+                [{"channel": "tickers", "instId": "BTC-USDT"}, ...]
+
+        Tracks channels for automatic re-subscription after reconnect.
         """
         if self._ws is None:
             raise ConnectionError("Not connected")
-
-        arg: dict[str, str] = {"channel": channel}
-        if inst_id:
-            arg["instId"] = inst_id
-
-        message = {"op": "subscribe", "args": [arg]}
-        await self._ws.send(json.dumps(message))
-        logger.info("ws_subscribed", channel=channel, inst_id=inst_id)
-
-    async def unsubscribe(self, channel: str, inst_id: str | None = None) -> None:
-        """Unsubscribe from channel."""
-        if self._ws is None:
+        if not channels:
             return
 
+        message = {"op": "subscribe", "args": channels}
+        await self._ws.send(json.dumps(message))
+
+        # Track channels for re-subscribe (deduplicated by JSON string)
+        existing = {json.dumps(c, sort_keys=True) for c in self._subscribed_channels}
+        for ch in channels:
+            key = json.dumps(ch, sort_keys=True)
+            if key not in existing:
+                self._subscribed_channels.append(ch)
+                existing.add(key)
+
+        logger.info(
+            "ws_subscribed",
+            count=len(channels),
+            total_tracked=len(self._subscribed_channels),
+        )
+
+    async def unsubscribe(self, channel: str, inst_id: str | None = None) -> None:
+        """Unsubscribe from a single channel."""
         arg: dict[str, str] = {"channel": channel}
         if inst_id:
             arg["instId"] = inst_id
+        await self.unsubscribe_many([arg])
 
-        message = {"op": "unsubscribe", "args": [arg]}
+    async def unsubscribe_many(self, channels: list[dict[str, str]]) -> None:
+        """
+        [NEW-CR-1] Unsubscribe from multiple channels and remove from tracking.
+
+        Args:
+            channels: List of channel configs to unsubscribe
+        """
+        if self._ws is None or not channels:
+            return
+
+        message = {"op": "unsubscribe", "args": channels}
         await self._ws.send(json.dumps(message))
+
+        # Remove from tracking
+        to_remove = {json.dumps(c, sort_keys=True) for c in channels}
+        self._subscribed_channels = [
+            c
+            for c in self._subscribed_channels
+            if json.dumps(c, sort_keys=True) not in to_remove
+        ]
+        logger.info("ws_unsubscribed", count=len(channels))
 
     async def disconnect(self) -> None:
         """Disconnect from WebSocket."""
         self._running = False
+        self._connected.clear()
+        # [NEW-CR-1] Clear subscription tracking on full disconnect
+        self._subscribed_channels = []
         if self._ws is not None:
             await self._ws.close()
             self._ws = None

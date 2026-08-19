@@ -2,20 +2,27 @@
 Exchange Adapter Factory.
 
 This module provides a factory for creating exchange adapters based on the
-selected exchange ID. It is the single wiring point between configuration
-and concrete exchange implementations.
+selected exchange ID. It receives a registry of adapter classes via dependency
+injection from the composition root (infrastructure layer).
 
 Key rules:
 1. The application layer depends ONLY on the ExchangeAdapter interface
-2. Selecting an exchange that is not configured raises ExchangeNotConfiguredError
-3. DEMO and LIVE use separate credentials per exchange
-4. Secrets never in logs
-5. Fail-fast: validate_config() before adapter creation
+2. Concrete adapter classes are injected via registry (never imported here)
+3. Selecting an exchange that is not configured raises ExchangeNotConfiguredError
+4. DEMO and LIVE use separate credentials per exchange
+5. Secrets never in logs
+6. Fail-fast: validate_config() before adapter creation
+
+[A-H13] Phase 10.1: Factory pattern with registry injection.
+The registry is built at composition root (infrastructure/exchange/registry.py)
+and injected into this factory. This ensures the application layer never
+imports concrete adapters from infrastructure.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, cast
 
 import structlog
 
@@ -31,6 +38,9 @@ if TYPE_CHECKING:
     from trading_grid.domain.exchange.interface import ExchangeAdapter
     from trading_grid.domain.shared.types import ExchangeId
 
+# Type alias for adapter constructor: takes exchange settings, returns adapter
+AdapterConstructor = Callable[[Any], "ExchangeAdapter"]
+
 logger = structlog.get_logger()
 
 SUPPORTED_EXCHANGES: tuple[ExchangeId, ...] = ("OKX", "BINANCE", "BYBIT")
@@ -40,18 +50,40 @@ class ExchangeAdapterFactory:
     """
     Factory for creating exchange adapters.
 
-    This is the single wiring point between configuration and concrete
-    exchange implementations. The application layer depends only on the
-    ExchangeAdapter interface, never on concrete adapter classes.
+    [A-H13] This factory receives a registry of adapter classes via constructor
+    injection. The registry is built at composition root (infrastructure layer)
+    and maps exchange IDs to concrete adapter classes.
+
+    The application layer depends only on the ExchangeAdapter interface,
+    never on concrete adapter classes.
 
     Usage:
-        adapter = ExchangeAdapterFactory.create("BINANCE", settings)
-        ExchangeAdapterFactory.validate_config("BINANCE", settings)  # fail-fast
-        configured = ExchangeAdapterFactory.get_configured_exchanges(settings)
+        # At composition root (infrastructure):
+        registry = build_adapter_registry()  # {"OKX": OKXAdapter, ...}
+        factory = ExchangeAdapterFactory(registry)
+
+        # In application code:
+        adapter = factory.create("BINANCE", settings)
+        factory.validate_config("BINANCE", settings)  # fail-fast
+        configured = factory.get_configured_exchanges(settings)
     """
 
-    @staticmethod
-    def validate_config(exchange_id: ExchangeId, settings: Settings) -> None:
+    def __init__(self, registry: dict[str, AdapterConstructor]) -> None:
+        """
+        Initialize the factory with an adapter registry.
+
+        Args:
+            registry: Mapping of exchange IDs to adapter constructors,
+                e.g., {"OKX": OKXAdapter, "BINANCE": BinanceAdapter, "BYBIT": BybitAdapter}
+        """
+        self._registry = registry
+
+    @property
+    def registry(self) -> dict[str, AdapterConstructor]:
+        """Get the adapter registry (for inspection/testing)."""
+        return dict(self._registry)
+
+    def validate_config(self, exchange_id: ExchangeId, settings: Settings) -> None:
         """
         Validate that an exchange is properly configured.
 
@@ -83,12 +115,12 @@ class ExchangeAdapterFactory:
         if exchange_id_upper == "BYBIT" and not settings.bybit.is_configured:
             raise ExchangeNotConfiguredError("BYBIT")
 
-    @staticmethod
-    def create(exchange_id: ExchangeId, settings: Settings) -> ExchangeAdapter:
+    def create(self, exchange_id: ExchangeId, settings: Settings) -> ExchangeAdapter:
         """
         Create an exchange adapter for the given exchange ID.
 
-        Validates configuration first (fail-fast), then creates the adapter.
+        Validates configuration first (fail-fast), then creates the adapter
+        using the registered adapter class.
 
         Args:
             exchange_id: Exchange to create adapter for ("OKX", "BINANCE", "BYBIT")
@@ -102,24 +134,21 @@ class ExchangeAdapterFactory:
             ValueError: If the exchange_id is not supported
         """
         # Fail-fast validation before creating adapter
-        ExchangeAdapterFactory.validate_config(exchange_id, settings)
+        self.validate_config(exchange_id, settings)
 
         exchange_id_upper = exchange_id.upper()
 
-        if exchange_id_upper == "OKX":
-            from trading_grid.infrastructure.okx.adapter import OKXAdapter
+        adapter_cls = self._registry.get(exchange_id_upper)
+        if adapter_cls is None:
+            raise ValueError(
+                f"No adapter registered for exchange: {exchange_id!r}. "
+                f"Registered: {', '.join(self._registry.keys())}"
+            )
 
-            adapter: ExchangeAdapter = OKXAdapter(settings.okx)
+        # Get the appropriate settings for this exchange
+        exchange_settings = self._get_exchange_settings(exchange_id_upper, settings)
 
-        elif exchange_id_upper == "BINANCE":
-            from trading_grid.infrastructure.binance.adapter import BinanceAdapter
-
-            adapter = BinanceAdapter(settings.binance)
-
-        else:  # BYBIT (already validated)
-            from trading_grid.infrastructure.bybit.adapter import BybitAdapter
-
-            adapter = BybitAdapter(settings.bybit)
+        adapter = adapter_cls(exchange_settings)
 
         logger.info(
             "exchange_adapter_created",
@@ -128,8 +157,24 @@ class ExchangeAdapterFactory:
         )
         return adapter
 
-    @staticmethod
-    def get_configured_exchanges(settings: Settings) -> list[ExchangeId]:
+    def _get_exchange_settings(self, exchange_id: str, settings: Settings) -> Any:
+        """
+        Get the exchange-specific settings object for an adapter.
+
+        Args:
+            exchange_id: Normalized exchange ID (uppercase)
+            settings: Application settings
+
+        Returns:
+            Exchange-specific settings (OKXSettings, BinanceSettings, or BybitSettings)
+        """
+        if exchange_id == "OKX":
+            return settings.okx
+        if exchange_id == "BINANCE":
+            return settings.binance
+        return settings.bybit  # BYBIT
+
+    def get_configured_exchanges(self, settings: Settings) -> list[ExchangeId]:
         """
         Get list of exchanges that have credentials configured.
 
@@ -148,8 +193,8 @@ class ExchangeAdapterFactory:
             configured.append("BYBIT")
         return configured
 
-    @staticmethod
     async def create_for_user(
+        self,
         exchange_id: ExchangeId,
         user_id: str,
         environment: str,
@@ -221,7 +266,7 @@ class ExchangeAdapterFactory:
         )
 
         # Build adapter with user credentials
-        adapter = ExchangeAdapterFactory._build_adapter_from_credential(
+        adapter = self._build_adapter_from_credential(
             exchange_id_upper, cred, environment, settings
         )
 
@@ -234,8 +279,8 @@ class ExchangeAdapterFactory:
         )
         return adapter
 
-    @staticmethod
     def _build_adapter_from_credential(
+        self,
         exchange_id: ExchangeId,
         cred: DecryptedCredential,
         environment: str,
@@ -245,6 +290,9 @@ class ExchangeAdapterFactory:
         Build an adapter instance from decrypted user credentials.
 
         Internal helper. Never logs credential values.
+
+        [A-H13] Uses the registry to get the adapter class instead of
+        importing concrete adapters directly.
 
         Args:
             exchange_id: Normalized exchange ID (uppercase)
@@ -257,11 +305,43 @@ class ExchangeAdapterFactory:
         """
         is_demo = environment == "DEMO"
 
+        adapter_cls = self._registry.get(exchange_id)
+        if adapter_cls is None:
+            raise ValueError(
+                f"No adapter registered for exchange: {exchange_id!r}. "
+                f"Registered: {', '.join(self._registry.keys())}"
+            )
+
+        # Build exchange-specific settings with user credentials
+        exchange_settings = self._build_settings_from_credential(
+            exchange_id, cred, is_demo, settings
+        )
+
+        return adapter_cls(exchange_settings)
+
+    def _build_settings_from_credential(
+        self,
+        exchange_id: str,
+        cred: DecryptedCredential,
+        is_demo: bool,
+        settings: Settings,
+    ) -> Any:
+        """
+        Build exchange-specific settings from decrypted user credentials.
+
+        Args:
+            exchange_id: Normalized exchange ID (uppercase)
+            cred: Decrypted credential container
+            is_demo: True for DEMO environment, False for LIVE
+            settings: Application settings for base URLs/timeouts
+
+        Returns:
+            Exchange-specific settings object
+        """
         if exchange_id == "OKX":
             from trading_grid.config.settings import OKXSettings
-            from trading_grid.infrastructure.okx.adapter import OKXAdapter
 
-            okx_settings = OKXSettings(
+            return OKXSettings(
                 api_key=cred.api_key,  # type: ignore[arg-type]
                 api_secret=cred.api_secret,  # type: ignore[arg-type]
                 passphrase=cred.passphrase or "",  # type: ignore[arg-type]
@@ -271,13 +351,11 @@ class ExchangeAdapterFactory:
                 timeout=settings.okx.timeout,
                 max_retries=settings.okx.max_retries,
             )
-            return OKXAdapter(okx_settings)
 
         if exchange_id == "BINANCE":
             from trading_grid.config.settings import BinanceSettings
-            from trading_grid.infrastructure.binance.adapter import BinanceAdapter
 
-            binance_settings = BinanceSettings(
+            return BinanceSettings(
                 api_key=cred.api_key,  # type: ignore[arg-type]
                 api_secret=cred.api_secret,  # type: ignore[arg-type]
                 testnet_mode=is_demo,
@@ -288,13 +366,11 @@ class ExchangeAdapterFactory:
                 timeout=settings.binance.timeout,
                 max_retries=settings.binance.max_retries,
             )
-            return BinanceAdapter(binance_settings)
 
         # BYBIT
         from trading_grid.config.settings import BybitSettings
-        from trading_grid.infrastructure.bybit.adapter import BybitAdapter
 
-        bybit_settings = BybitSettings(
+        return BybitSettings(
             api_key=cred.api_key,  # type: ignore[arg-type]
             api_secret=cred.api_secret,  # type: ignore[arg-type]
             testnet_mode=is_demo,
@@ -305,7 +381,43 @@ class ExchangeAdapterFactory:
             timeout=settings.bybit.timeout,
             max_retries=settings.bybit.max_retries,
         )
-        return BybitAdapter(bybit_settings)
+
+
+# ---------------------------------------------------------------------------
+# Module-level factory instance (set at composition root)
+# ---------------------------------------------------------------------------
+
+_factory_instance: ExchangeAdapterFactory | None = None
+
+
+def set_factory(factory: ExchangeAdapterFactory) -> None:
+    """
+    Set the module-level factory instance.
+
+    Called at composition root (api/app.py or service_container.py) after
+    building the registry.
+
+    Args:
+        factory: Configured ExchangeAdapterFactory instance
+    """
+    global _factory_instance
+    _factory_instance = factory
+    logger.info("exchange_adapter_factory_set")
+
+
+def get_factory() -> ExchangeAdapterFactory:
+    """
+    Get the module-level factory instance.
+
+    Raises:
+        RuntimeError: If factory has not been set (call set_factory first)
+    """
+    if _factory_instance is None:
+        raise RuntimeError(
+            "ExchangeAdapterFactory not initialized. "
+            "Call set_factory() at composition root first."
+        )
+    return _factory_instance
 
 
 # ---------------------------------------------------------------------------
@@ -317,7 +429,7 @@ def create_exchange_adapter(exchange_id: ExchangeId, settings: Settings) -> Exch
     """
     Create an exchange adapter for the given exchange ID.
 
-    Backward-compatible wrapper around ExchangeAdapterFactory.create().
+    Backward-compatible wrapper around get_factory().create().
 
     Args:
         exchange_id: Exchange to create adapter for ("OKX", "BINANCE", "BYBIT")
@@ -329,20 +441,24 @@ def create_exchange_adapter(exchange_id: ExchangeId, settings: Settings) -> Exch
     Raises:
         ExchangeNotConfiguredError: If the exchange credentials are missing
         ValueError: If the exchange_id is not supported
+        RuntimeError: If factory has not been initialized
     """
-    return ExchangeAdapterFactory.create(exchange_id, settings)
+    return get_factory().create(exchange_id, settings)
 
 
 def get_configured_exchanges(settings: Settings) -> list[ExchangeId]:
     """
     Get list of exchanges that have credentials configured.
 
-    Backward-compatible wrapper around ExchangeAdapterFactory.get_configured_exchanges().
+    Backward-compatible wrapper around get_factory().get_configured_exchanges().
 
     Args:
         settings: Application settings
 
     Returns:
         List of configured exchange IDs
+
+    Raises:
+        RuntimeError: If factory has not been initialized
     """
-    return ExchangeAdapterFactory.get_configured_exchanges(settings)
+    return get_factory().get_configured_exchanges(settings)

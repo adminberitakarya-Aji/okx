@@ -28,6 +28,7 @@ import websockets
 from websockets.exceptions import ConnectionClosed
 
 from trading_grid.config.settings import BybitSettings
+from trading_grid.infrastructure._common.ws_backoff import ws_reconnect_delay
 
 logger = structlog.get_logger()
 
@@ -43,7 +44,9 @@ class BybitWebSocketClient:
     """
 
     PING_INTERVAL = 20  # seconds (Bybit requires ping every 20s)
-    RECONNECT_DELAY = 5  # seconds
+    # [NEW-M-3] Reconnect uses exponential backoff via ws_reconnect_delay.
+    # RECONNECT_DELAY kept for backward compatibility but no longer used directly.
+    RECONNECT_DELAY = 5  # seconds (legacy, replaced by exponential backoff)
 
     def __init__(self, settings: BybitSettings, private: bool = False) -> None:
         """
@@ -59,6 +62,13 @@ class BybitWebSocketClient:
         self._running = False
         self._message_handlers: list[Callable[[dict[str, Any]], None]] = []
         self._disconnect_handlers: list[Callable[[], None]] = []
+        # [NEW-CR-1] Track connection state and subscriptions for reconnect logic
+        self._connected: asyncio.Event = asyncio.Event()
+        self._subscribed_topics: list[str] = []
+        # [NEW-M-3] Track consecutive reconnect attempts for exponential backoff
+        self._reconnect_attempt = 0
+        # [NEW-M-5] Track in-flight async handler tasks to prevent GC (RUF006)
+        self._handler_tasks: set[asyncio.Task[Any]] = set()
 
     @property
     def ws_url(self) -> str:
@@ -84,6 +94,7 @@ class BybitWebSocketClient:
     async def connect(self) -> None:
         """Connect to WebSocket with iterative reconnect loop."""
         self._running = True
+        self._reconnect_attempt = 0
         while self._running:
             await self._connect()
 
@@ -93,19 +104,29 @@ class BybitWebSocketClient:
             logger.info("bybit_ws_connecting", url=self.ws_url, private=self._private)
             self._ws = await websockets.connect(self.ws_url)
             logger.info("bybit_ws_connected", private=self._private)
+            # [NEW-M-3] Reset attempt counter on successful connect
+            self._reconnect_attempt = 0
+            # [NEW-CR-1] Signal connection ready
+            self._connected.set()
 
             # Authenticate for private channel
             if self._private:
                 await self._authenticate()
 
+            # [NEW-CR-1] Re-subscribe topics after reconnect
+            if self._subscribed_topics:
+                await self._resubscribe_all()
+
             await self._message_loop()
         except ConnectionClosed as e:
             logger.warning("bybit_ws_connection_closed", code=e.code, reason=e.reason)
+            self._connected.clear()
             self._notify_disconnect()
             if self._running:
                 await self._schedule_reconnect()
         except Exception as e:
             logger.error("bybit_ws_error", error=str(e))
+            self._connected.clear()
             self._notify_disconnect()
             if self._running:
                 await self._schedule_reconnect()
@@ -172,10 +193,18 @@ class BybitWebSocketClient:
                 logger.info("bybit_ws_subscription", op=data.get("op"), success=data.get("success"))
                 return
 
-            # Dispatch to handlers
+            # [NEW-M-5] Dispatch to handlers — async handlers run as tasks,
+            # sync handlers run in executor to avoid blocking the event loop.
             for handler in self._message_handlers:
                 try:
-                    handler(data)
+                    if asyncio.iscoroutinefunction(handler):
+                        # RUF006: track task in set to prevent GC
+                        task = asyncio.create_task(handler(data))
+                        self._handler_tasks.add(task)
+                        task.add_done_callback(self._handler_tasks.discard)
+                    else:
+                        loop = asyncio.get_event_loop()
+                        await loop.run_in_executor(None, handler, data)
                 except Exception as e:
                     logger.error("bybit_ws_handler_error", error=str(e))
 
@@ -191,9 +220,15 @@ class BybitWebSocketClient:
                 logger.warning("bybit_ws_ping_failed", error=str(e))
 
     async def _schedule_reconnect(self) -> None:
-        """Schedule reconnection delay (reconnection loop handled by connect())."""
-        logger.info("bybit_ws_scheduling_reconnect", delay=self.RECONNECT_DELAY)
-        await asyncio.sleep(self.RECONNECT_DELAY)
+        """Schedule reconnection delay with exponential backoff + jitter."""
+        delay = ws_reconnect_delay(self._reconnect_attempt)
+        self._reconnect_attempt += 1
+        logger.info(
+            "bybit_ws_scheduling_reconnect",
+            delay=delay,
+            attempt=self._reconnect_attempt,
+        )
+        await asyncio.sleep(delay)
 
     def _notify_disconnect(self) -> None:
         """Notify disconnect handlers."""
@@ -203,31 +238,108 @@ class BybitWebSocketClient:
             except Exception as e:
                 logger.error("bybit_ws_disconnect_handler_error", error=str(e))
 
+    async def _wait_for_connected(self, timeout: float = 10.0) -> None:
+        """
+        [NEW-CR-1] Wait until WebSocket is connected.
+
+        Args:
+            timeout: Maximum seconds to wait
+
+        Raises:
+            asyncio.TimeoutError: If connection not established within timeout
+        """
+        try:
+            await asyncio.wait_for(self._connected.wait(), timeout=timeout)
+        except TimeoutError:
+            logger.error("bybit_ws_connect_timeout", timeout=timeout)
+            raise
+
+    async def _resubscribe_all(self) -> None:
+        """
+        [NEW-CR-1] Re-subscribe all tracked topics after reconnect.
+
+        Called automatically by _connect() when re-establishing connection.
+        """
+        if not self._subscribed_topics or self._ws is None:
+            return
+        msg = {"op": "subscribe", "args": list(self._subscribed_topics)}
+        await self._ws.send(json.dumps(msg))
+        logger.info(
+            "bybit_ws_resubscribed",
+            count=len(self._subscribed_topics),
+            private=self._private,
+        )
+
     async def subscribe(self, topic: str) -> None:
         """
-        Subscribe to topic.
+        Subscribe to a single topic (legacy helper).
 
         Args:
             topic: Topic name (e.g., 'tickers.BTCUSDT', 'order')
+
+        Note:
+            For multiple topics at once, prefer subscribe_many().
+        """
+        await self.subscribe_many([topic])
+
+    async def subscribe_many(self, topics: list[str]) -> None:
+        """
+        [NEW-CR-1] Subscribe to multiple topics at once.
+
+        Args:
+            topics: List of topic names, e.g.
+                ["tickers.BTCUSDT", "kline.60.ETHUSDT", "order"]
+
+        Tracks topics for automatic re-subscription after reconnect.
         """
         if self._ws is None:
             raise ConnectionError("Not connected")
-
-        message = {"op": "subscribe", "args": [topic]}
-        await self._ws.send(json.dumps(message))
-        logger.info("bybit_ws_subscribed", topic=topic)
-
-    async def unsubscribe(self, topic: str) -> None:
-        """Unsubscribe from topic."""
-        if self._ws is None:
+        if not topics:
             return
 
-        message = {"op": "unsubscribe", "args": [topic]}
+        message = {"op": "subscribe", "args": topics}
         await self._ws.send(json.dumps(message))
+
+        # Track topics for re-subscribe (deduplicated)
+        for topic in topics:
+            if topic not in self._subscribed_topics:
+                self._subscribed_topics.append(topic)
+
+        logger.info(
+            "bybit_ws_subscribed",
+            count=len(topics),
+            total_tracked=len(self._subscribed_topics),
+        )
+
+    async def unsubscribe(self, topic: str) -> None:
+        """Unsubscribe from a single topic (legacy helper)."""
+        await self.unsubscribe_many([topic])
+
+    async def unsubscribe_many(self, topics: list[str]) -> None:
+        """
+        [NEW-CR-1] Unsubscribe from topics and remove from tracking.
+
+        Args:
+            topics: List of topic names to unsubscribe
+        """
+        if self._ws is None or not topics:
+            return
+
+        message = {"op": "unsubscribe", "args": topics}
+        await self._ws.send(json.dumps(message))
+
+        # Remove from tracking
+        self._subscribed_topics = [
+            t for t in self._subscribed_topics if t not in topics
+        ]
+        logger.info("bybit_ws_unsubscribed", count=len(topics))
 
     async def disconnect(self) -> None:
         """Disconnect from WebSocket."""
         self._running = False
+        self._connected.clear()
+        # [NEW-CR-1] Clear subscription tracking on full disconnect
+        self._subscribed_topics = []
         if self._ws is not None:
             await self._ws.close()
             self._ws = None

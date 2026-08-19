@@ -10,7 +10,7 @@ Verifies:
 
 import pytest
 
-from trading_grid.infrastructure.exchange.symbols import (
+from trading_grid.domain.market.symbols import (
     to_concatenated_symbol,
     to_normalized_market_id,
 )

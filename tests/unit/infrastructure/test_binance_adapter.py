@@ -85,6 +85,29 @@ class TestBinanceAdapterWebSocket:
             await adapter.start_private_ws()
             mock_ws.assert_called_once()
 
+    async def test_subscribe_market_ids_sends_correct_streams(self):
+        """[NEW-CR-1] subscribe_market_ids() must build @ticker and @kline_1h streams."""
+        adapter = _make_adapter()
+        with patch("trading_grid.infrastructure.binance.adapter.BinanceWebSocketClient") as mock_ws_cls:
+            mock_ws = AsyncMock()
+            mock_ws_cls.return_value = mock_ws
+
+            await adapter.start_market_data_ws(market_ids=["BTC-USDT", "ETH-USDT"])
+
+            mock_ws.subscribe.assert_called_once()
+            streams = mock_ws.subscribe.call_args[0][0]
+            assert "btcusdt@ticker" in streams
+            assert "btcusdt@kline_1h" in streams
+            assert "ethusdt@ticker" in streams
+            assert "ethusdt@kline_1h" in streams
+            assert len(streams) == 4
+
+    async def test_subscribe_market_ids_without_ws_raises(self):
+        """subscribe_market_ids() without start_market_data_ws must raise."""
+        adapter = _make_adapter()
+        with pytest.raises(RuntimeError):
+            await adapter.subscribe_market_ids(["BTC-USDT"])
+
     def test_on_order_update(self):
         adapter = _make_adapter()
         handler = MagicMock()

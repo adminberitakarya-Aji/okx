@@ -123,7 +123,7 @@ class ExecutionEngine:
         user_id: str | None = None,
         active_grid_count: int = 0,
         idempotency_key: str | None = None,
-        identity: Identity | None = None,
+        identity: Identity = None,  # type: ignore[assignment]  # [A-H12] Required — no default
         skip_rate_limit: bool = False,
     ) -> ExecutionResult:
         """
@@ -139,7 +139,8 @@ class ExecutionEngine:
         per-user check fails, the order is rejected locally and never reaches
         the exchange.
 
-        [A-H7] Authorization: When an identity is provided, the engine verifies:
+        [A-H7] Authorization: [A-H12] identity is REQUIRED (no default).
+        The engine verifies:
         1. The identity can access the current environment (DEMO/LIVE)
         2. The identity has sufficient permission level:
            - DEMO mode: DEMO_OPERATOR (Level 2)
@@ -167,9 +168,10 @@ class ExecutionEngine:
             idempotency_key: Deterministic key for deduplication. If an
                 order with this key already exists in an active/filled
                 state, the existing result is returned (no duplicate submit).
-            identity: [A-H7] Authenticated identity for RBAC authorization.
-                When provided, environment access and permission level are
-                verified before order execution.
+            identity: [A-H12] REQUIRED authenticated identity for RBAC
+                authorization. Must be provided by every caller. System-level
+                callers (price monitor, background tasks) must provide a
+                SYSTEM identity.
             skip_rate_limit: [A-M1] Skip the per-user interactive rate limit
                 check. Used by autonomous grid triggers (PriceMonitorService)
                 so that machine-generated orders are not throttled by the
@@ -178,25 +180,39 @@ class ExecutionEngine:
 
         Returns:
             ExecutionResult with order details
+
+        Raises:
+            ValueError: If identity is None (belt-and-suspenders — mypy
+                enforces this statically, this covers runtime edge cases).
         """
-        # [A-H7] AUTHORIZATION CHECK — verify identity can execute in this environment
-        if identity is not None:
-            auth_result = self._check_execution_authorization(identity)
-            if not auth_result.is_authorized:
-                logger.warning(
-                    "execute_order_unauthorized",
-                    identity_id=identity.identity_id,
-                    role=identity.role.name,
-                    environment=self.mode,
-                    reason=auth_result.reason,
-                    market_id=market_id,
-                    side=side,
-                )
-                return ExecutionResult(
-                    success=False,
-                    order_id="UNAUTHORIZED",
-                    error_message=f"Authorization denied: {auth_result.reason}",
-                )
+        # [A-H12] Belt and suspenders — identity must never be None.
+        # mypy enforces this at compile time; this guards runtime edge cases.
+        if identity is None:
+            logger.error(
+                "execute_order_missing_identity",
+                market_id=market_id,
+                side=side,
+            )
+            raise ValueError("identity is required for execute_order")
+
+        # [A-H7] AUTHORIZATION CHECK — verify identity can execute in this environment.
+        # [A-H12] This is now UNCONDITIONAL — no caller can bypass authorization.
+        auth_result = self._check_execution_authorization(identity)
+        if not auth_result.is_authorized:
+            logger.warning(
+                "execute_order_unauthorized",
+                identity_id=identity.identity_id,
+                role=identity.role.name,
+                environment=self.mode,
+                reason=auth_result.reason,
+                market_id=market_id,
+                side=side,
+            )
+            return ExecutionResult(
+                success=False,
+                order_id="UNAUTHORIZED",
+                error_message=f"Authorization denied: {auth_result.reason}",
+            )
         # IDEMPOTENCY CHECK — return existing result if this key was already
         # processed. This is the primary defense against double-execution
         # caused by network timeouts + retries. The DB unique constraint on

@@ -86,6 +86,46 @@ class TestOKXAdapterWebSocket:
             await adapter.start_private_ws()
             mock_ws.assert_called_once()
 
+    async def test_subscribe_market_ids_sends_correct_channels(self):
+        """[NEW-CR-1] subscribe_market_ids() must build ticker+candle channels."""
+        adapter = _make_adapter()
+        with patch("trading_grid.infrastructure.okx.adapter.OKXWebSocketClient") as mock_ws_cls:
+            mock_ws = AsyncMock()
+            mock_ws_cls.return_value = mock_ws
+
+            # Pre-create client (start_market_data_ws normally does this)
+            await adapter.start_market_data_ws(market_ids=["BTC-USDT", "ETH-USDT"])
+
+            # Verify subscribe_many was called with the right channel list
+            mock_ws.subscribe_many.assert_called_once()
+            args = mock_ws.subscribe_many.call_args[0][0]
+            assert {"channel": "tickers", "instId": "BTC-USDT"} in args
+            assert {"channel": "candle1H", "instId": "BTC-USDT"} in args
+            assert {"channel": "tickers", "instId": "ETH-USDT"} in args
+            assert {"channel": "candle1H", "instId": "ETH-USDT"} in args
+            assert len(args) == 4
+
+    async def test_subscribe_market_ids_without_ws_raises(self):
+        """subscribe_market_ids() without start_market_data_ws must raise."""
+        adapter = _make_adapter()
+        with pytest.raises(RuntimeError):
+            await adapter.subscribe_market_ids(["BTC-USDT"])
+
+    async def test_subscribe_private_channels(self):
+        """[NEW-CR-1] subscribe_private_channels() must send SUBSCRIBE."""
+        adapter = _make_adapter()
+        with patch("trading_grid.infrastructure.okx.adapter.OKXWebSocketClient") as mock_ws_cls:
+            mock_ws = AsyncMock()
+            mock_ws_cls.return_value = mock_ws
+
+            await adapter.start_private_ws()
+            await adapter.subscribe_private_channels(["orders", "account"])
+
+            mock_ws.subscribe_many.assert_called_once()
+            args = mock_ws.subscribe_many.call_args[0][0]
+            assert {"channel": "orders"} in args
+            assert {"channel": "account"} in args
+
     def test_on_order_update(self):
         adapter = _make_adapter()
         handler = MagicMock()

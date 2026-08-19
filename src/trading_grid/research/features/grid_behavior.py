@@ -375,7 +375,8 @@ def extract_grid_behavior_features(
     if window > 0:
         features.buy_frequency = len(buy_events) / window
     features.average_buy_interval = _average_interval(buy_events)
-    features.maximum_buy_burst = _max_burst(buy_events, burst_window=3)
+    # [TD-5] Pass candle_interval_hours explicitly (1H candles used by simulation)
+    features.maximum_buy_burst = _max_burst(buy_events, burst_window=3, candle_interval_hours=1.0)
 
     # --- SELL Behavior (F-GRD-011 to F-GRD-014) ---
     features.sell_event_count = len(sell_events)
@@ -541,17 +542,20 @@ def _average_interval(events: Sequence[SimulationEvent]) -> float | None:
 
 def _max_burst(
     events: Sequence[SimulationEvent],
-    burst_window: int = 3,
-    candle_interval_hours: float = 1.0,
+    burst_window: int,
+    candle_interval_hours: float,
 ) -> int | None:
     """
     Maximum number of events within a sliding window of burst_window candles.
 
+    [TD-5] candle_interval_hours is now required (no default) to prevent
+    silent misconfiguration when using non-1H candles.
+
     Args:
         events: Simulation events to analyse.
         burst_window: Number of candles per burst window.
-        candle_interval_hours: Duration of each candle in hours. Default 1h.
-            Set to 0.25 for 15-minute candles, 4 for 4-hour candles, etc.
+        candle_interval_hours: Duration of each candle in hours (REQUIRED).
+            Set to 1.0 for 1H candles, 0.25 for 15-minute candles, 4 for 4-hour candles, etc.
     """
     if not events:
         return 0

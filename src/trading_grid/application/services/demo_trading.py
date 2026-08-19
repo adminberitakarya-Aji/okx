@@ -23,6 +23,7 @@ from uuid import uuid4
 
 import structlog
 
+from trading_grid.application.services.authorization import Identity
 from trading_grid.application.services.execution_engine import ExecutionEngine, ExecutionResult
 from trading_grid.application.services.grid_engine import GridEngine, GridEngineError, GridRuntime
 from trading_grid.application.services.price_monitor import PriceMonitorService
@@ -384,9 +385,13 @@ class DemoTradingService:
 
         return session
 
-    async def start_demo_grid(self, session_id: str) -> DemoGridSession:
+    async def start_demo_grid(self, session_id: str, identity: Identity) -> DemoGridSession:
         """
         Start a demo grid session with IMMEDIATE FIRST ENTRY.
+
+        [A-H11] identity is REQUIRED (no default). Ownership is checked:
+        only the session owner (or SYSTEM identity) can start the grid.
+        This prevents User B from starting a session owned by User A.
 
         Execution flow:
         1. IMMEDIATE FIRST ENTRY — market BUY at anchor level
@@ -402,14 +407,33 @@ class DemoTradingService:
 
         Args:
             session_id: Session to start
+            identity: [A-H11] REQUIRED authenticated identity. Must be
+                the session owner (session.user_id) or a SYSTEM identity.
 
         Returns:
             Updated DemoGridSession
 
         Raises:
             DemoTradingError: If session not found or cannot start
+            PermissionError: [A-H11] If identity is not the session owner
+                and not a SYSTEM identity.
         """
         session = self._get_session(session_id)
+
+        # [A-H11] OWNERSHIP CHECK — only the session owner (or SYSTEM)
+        # may start the grid. Coupled with I-C3 (route ownership check).
+        if session.user_id is not None and identity.identity_type != "SYSTEM":
+            if session.user_id != identity.identity_id:
+                logger.warning(
+                    "unauthorized_start_demo_grid",
+                    session_id=session_id,
+                    owner_user_id=session.user_id,
+                    attempted_user_id=identity.identity_id,
+                )
+                raise PermissionError(
+                    f"User {identity.identity_id} cannot start session {session_id} "
+                    f"owned by {session.user_id}"
+                )
 
         # STEP 1: Start the grid (transition to RUNNING first for session state atomicity)
         try:
@@ -422,7 +446,7 @@ class DemoTradingService:
         session.metrics.record_state_transition()
 
         # STEP 2: IMMEDIATE FIRST ENTRY (market BUY at anchor level)
-        initial_entry_result = await self._execute_initial_entry(session)
+        initial_entry_result = await self._execute_initial_entry(session, identity)
 
         if initial_entry_result is not None and initial_entry_result.success:
             session.add_note("Demo grid started with initial entry position")
@@ -447,7 +471,9 @@ class DemoTradingService:
 
         return session
 
-    async def _execute_initial_entry(self, session: DemoGridSession) -> ExecutionResult | None:
+    async def _execute_initial_entry(
+        self, session: DemoGridSession, identity: Identity
+    ) -> ExecutionResult | None:
         """
         Execute the IMMEDIATE FIRST ENTRY for a grid.
 
@@ -469,6 +495,7 @@ class DemoTradingService:
 
         Args:
             session: Demo session to execute initial entry for
+            identity: [A-H12] REQUIRED identity passed through to execute_order
 
         Returns:
             ExecutionResult if attempted, None if no anchor level found
@@ -547,6 +574,7 @@ class DemoTradingService:
             reference_price=current_price,
             user_id=session.user_id,
             idempotency_key=idempotency_key,
+            identity=identity,  # [A-H12] Pass through authenticated identity
         )
 
         if result.success:
@@ -790,6 +818,7 @@ class DemoTradingService:
         quantity: Decimal,
         price: Decimal | None = None,
         metadata: dict[str, Any] | None = None,
+        identity: Identity = None,  # type: ignore[assignment]  # [A-H12] Required
     ) -> ExecutionResult:
         """
         Execute an order in demo mode.
@@ -801,13 +830,19 @@ class DemoTradingService:
             quantity: Order quantity
             price: Limit price (None for market orders)
             metadata: Additional metadata
+            identity: [A-H12] REQUIRED authenticated identity passed through
+                to execute_order. No default — callers must provide it.
 
         Returns:
             ExecutionResult
 
         Raises:
             DemoTradingError: If session not found or not running
+            ValueError: If identity is None
         """
+        if identity is None:
+            raise ValueError("identity is required for execute_demo_order")
+
         session = self._get_session(session_id)
 
         if session.status != "RUNNING":
@@ -826,6 +861,7 @@ class DemoTradingService:
             price=price,
             metadata={**(metadata or {}), "demo_session_id": session_id},
             user_id=session.user_id,
+            identity=identity,  # [A-H12] Pass through authenticated identity
         )
 
         latency_ms = (time.perf_counter() - start_time) * 1000

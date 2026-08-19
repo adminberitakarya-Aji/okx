@@ -75,6 +75,28 @@ class AppSettings(BaseSettings):
                 "APP_DEBUG=true is not permitted when APP_ENV=production. "
                 "Set APP_DEBUG=false for production deployments."
             )
+        # [NEW-CR-2] Production must use a strong, non-default secret_key
+        # (used for HS256 JWT signing). Default dev secret is unsafe for
+        # production because JWTs could be forged by anyone with the source.
+        if self.is_production:
+            secret = self.secret_key.get_secret_value()
+            _FORBIDDEN_SECRETS = (
+                "",
+                "change-me",
+                "dev-jwt-secret-key-change-in-production",
+            )
+            if secret in _FORBIDDEN_SECRETS:
+                raise ValueError(
+                    "APP_SECRET_KEY must be explicitly set in production. "
+                    "The default dev secret is unsafe for production. "
+                    "Generate a strong random key with: "
+                    "python -c 'import secrets; print(secrets.token_urlsafe(64))'"
+                )
+            if len(secret) < 32:
+                raise ValueError(
+                    "APP_SECRET_KEY must be at least 32 characters for HS256 "
+                    f"JWT signing. Current length: {len(secret)}."
+                )
         return self
 
     @property
@@ -197,6 +219,9 @@ class BinanceSettings(BaseSettings):
     testnet_ws_url: str = "wss://testnet.binance.vision/ws"
     timeout: int = 30
     max_retries: int = 3
+    # [NEW-M-2] recvWindow for signed requests (ms). Configurable to handle
+    # high network latency on VPS deployments. Default 5000ms per Binance spec.
+    recv_window_ms: int = 5000
 
     @property
     def demo_mode(self) -> bool:
@@ -420,6 +445,8 @@ class ResearchSettings(BaseSettings):
     lookback_days: int = 365 * 3  # 3 years
     min_candles: int = 1000
     n_jobs: int = -1  # Use all CPU cores
+    # [TD-7] Derived ML feature version — configurable via RESEARCH_DERIVED_ML_VERSION
+    derived_ml_version: str = "fml-v001"
 
 
 class Settings(BaseSettings):

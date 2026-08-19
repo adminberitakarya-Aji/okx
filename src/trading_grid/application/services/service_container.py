@@ -12,6 +12,10 @@ This module instantiates and wires all application services together:
 
 This is the single place where services are created and connected,
 resolving the "orphan service" problem identified in the audit.
+
+[A-H13] Phase 10.1: ExchangeAdapterFactory receives registry via injection.
+The registry is built at composition root (infrastructure layer) and injected
+into the factory. This ensures application layer never imports concrete adapters.
 """
 
 from __future__ import annotations
@@ -22,7 +26,10 @@ import structlog
 
 from trading_grid.application.services.approval import ApprovalService
 from trading_grid.application.services.demo_trading import DemoTradingService
-from trading_grid.application.services.exchange_factory import ExchangeAdapterFactory
+from trading_grid.application.services.exchange_factory import (
+    ExchangeAdapterFactory,
+    set_factory,
+)
 from trading_grid.application.services.execution_engine import ExecutionEngine
 from trading_grid.application.services.grid_engine import GridEngine
 from trading_grid.application.services.price_monitor import PriceMonitorService
@@ -38,19 +45,49 @@ if TYPE_CHECKING:
 logger = structlog.get_logger()
 
 
+def _build_exchange_factory() -> ExchangeAdapterFactory:
+    """
+    Build the ExchangeAdapterFactory with registry from infrastructure.
+
+    [A-H13] This is the composition root wiring point. The registry is built
+    in infrastructure (which can import concrete adapters) and injected into
+    the application-layer factory.
+
+    Returns:
+        Configured ExchangeAdapterFactory instance
+    """
+    from trading_grid.infrastructure.exchange.registry import build_adapter_registry
+
+    registry = build_adapter_registry()
+    factory = ExchangeAdapterFactory(registry)
+
+    # Set module-level factory for backward-compatible function wrappers
+    set_factory(factory)
+
+    return factory
+
+
 class ServiceContainer:
     """Composition root for application services."""
 
-    def __init__(self, settings: Settings, exchange_id: ExchangeId | str = "OKX") -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        exchange_id: ExchangeId | str = "OKX",
+        exchange_factory: ExchangeAdapterFactory | None = None,
+    ) -> None:
         """
         Initialize the service container.
 
         Args:
             settings: Application settings
             exchange_id: Default exchange for this container ("OKX", "BINANCE", "BYBIT")
+            exchange_factory: [A-H13] Optional factory instance. If not provided,
+                a new factory is built from the infrastructure registry.
         """
         self._settings = settings
         self._exchange_id: ExchangeId = cast("ExchangeId", exchange_id.upper())
+        self._exchange_factory = exchange_factory or _build_exchange_factory()
         self._adapter: ExchangeAdapter | None = None
         self._grid_engine: GridEngine | None = None
         self._execution_engine: ExecutionEngine | None = None
@@ -65,10 +102,15 @@ class ServiceContainer:
         return self._exchange_id
 
     @property
+    def exchange_factory(self) -> ExchangeAdapterFactory:
+        """[A-H13] Get the exchange adapter factory."""
+        return self._exchange_factory
+
+    @property
     def adapter(self) -> ExchangeAdapter:
         """Get the exchange adapter (lazy init)."""
         if self._adapter is None:
-            self._adapter = ExchangeAdapterFactory.create(self._exchange_id, self._settings)
+            self._adapter = self._exchange_factory.create(self._exchange_id, self._settings)
         return self._adapter
 
     @property
@@ -83,7 +125,11 @@ class ServiceContainer:
         """Get the execution engine (lazy init)."""
         if self._execution_engine is None:
             risk_validator = RiskValidationService.from_risk_settings(self._settings.risk)
-            tenant_limits = TenantLimitsService(self._settings)
+            # [A-M1-REV] Inject GridEngine for auto-fetching active grid count
+            tenant_limits = TenantLimitsService(
+                self._settings,
+                grid_engine=self.grid_engine,
+            )
             self._execution_engine = ExecutionEngine(
                 adapter=self.adapter,
                 risk_validator=risk_validator,
@@ -156,16 +202,35 @@ class MultiExchangeContainer:
     simultaneously. Each exchange gets its own isolated ServiceContainer
     with its own adapter, execution engine, and demo service.
 
+    [A-H13] Phase 10.1: Uses injected ExchangeAdapterFactory with registry.
+
     Usage:
         multi = MultiExchangeContainer(settings)
         okx_container = multi.get_container("OKX")
         binance_container = multi.get_container("BINANCE")
     """
 
-    def __init__(self, settings: Settings) -> None:
-        """Initialize the multi-exchange registry."""
+    def __init__(
+        self,
+        settings: Settings,
+        exchange_factory: ExchangeAdapterFactory | None = None,
+    ) -> None:
+        """
+        Initialize the multi-exchange registry.
+
+        Args:
+            settings: Application settings
+            exchange_factory: [A-H13] Optional factory instance. If not provided,
+                a new factory is built from the infrastructure registry.
+        """
         self._settings = settings
+        self._exchange_factory = exchange_factory or _build_exchange_factory()
         self._containers: dict[str, ServiceContainer] = {}
+
+    @property
+    def exchange_factory(self) -> ExchangeAdapterFactory:
+        """[A-H13] Get the exchange adapter factory."""
+        return self._exchange_factory
 
     def get_container(self, exchange_id: str) -> ServiceContainer:
         """
@@ -188,7 +253,9 @@ class MultiExchangeContainer:
 
         if exchange_id_upper not in self._containers:
             self._containers[exchange_id_upper] = ServiceContainer(
-                self._settings, exchange_id=cast("ExchangeId", exchange_id_upper)
+                self._settings,
+                exchange_id=cast("ExchangeId", exchange_id_upper),
+                exchange_factory=self._exchange_factory,
             )
             logger.info("exchange_container_created", exchange=exchange_id_upper)
 
@@ -196,7 +263,7 @@ class MultiExchangeContainer:
 
     def get_configured_exchanges(self) -> list[ExchangeId]:
         """Get list of exchanges that have credentials configured."""
-        return ExchangeAdapterFactory.get_configured_exchanges(self._settings)
+        return self._exchange_factory.get_configured_exchanges(self._settings)
 
     @property
     def default_container(self) -> ServiceContainer:

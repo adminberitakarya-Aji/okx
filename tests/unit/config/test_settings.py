@@ -8,12 +8,14 @@ Tests verify:
 4. Environment-based configuration
 """
 
+import secrets
 from decimal import Decimal
 
 import pytest
 
 from trading_grid.config.settings import (
     AppSettings,
+    BinanceSettings,
     DatabaseSettings,
     Environment,
     OKXSettings,
@@ -46,14 +48,25 @@ class TestAppSettings:
 
     def test_is_production(self) -> None:
         """is_production should return True for production env."""
-        settings = AppSettings(env=Environment.PRODUCTION, _env_file=None)
+        # [NEW-CR-2] Provide strong secret_key to pass production validator.
+        settings = AppSettings(
+            env=Environment.PRODUCTION,
+            secret_key=secrets.token_urlsafe(64),
+            _env_file=None,
+        )
         assert settings.is_production is True
         assert settings.is_development is False
 
     def test_debug_true_rejected_in_production(self) -> None:
         """SECURITY: APP_DEBUG=true must be rejected when APP_ENV=production."""
+        # [NEW-CR-2] Provide strong secret_key; we are testing debug check.
         with pytest.raises(ValueError, match="APP_DEBUG"):
-            AppSettings(env=Environment.PRODUCTION, debug=True, _env_file=None)
+            AppSettings(
+                env=Environment.PRODUCTION,
+                debug=True,
+                secret_key=secrets.token_urlsafe(64),
+                _env_file=None,
+            )
 
     def test_debug_true_allowed_in_development(self) -> None:
         """APP_DEBUG=true is allowed in development (docs/CORS only)."""
@@ -62,8 +75,14 @@ class TestAppSettings:
 
     def test_dev_auth_enabled_rejected_in_production(self) -> None:
         """SECURITY: dev auth bypass must be rejected outside development."""
+        # [NEW-CR-2] Provide strong secret_key; we are testing dev_auth check.
         with pytest.raises(ValueError, match="APP_DEV_AUTH_ENABLED"):
-            AppSettings(env=Environment.PRODUCTION, dev_auth_enabled=True, _env_file=None)
+            AppSettings(
+                env=Environment.PRODUCTION,
+                dev_auth_enabled=True,
+                secret_key=secrets.token_urlsafe(64),
+                _env_file=None,
+            )
 
     def test_dev_auth_enabled_rejected_in_staging(self) -> None:
         """SECURITY: dev auth bypass must be rejected in staging."""
@@ -130,6 +149,51 @@ class TestOKXSettings:
         assert "super-secret-key" not in repr_str
         assert "super-secret-secret" not in repr_str
         assert "super-secret-passphrase" not in repr_str
+
+
+class TestBinanceSettings:
+    """Tests for BinanceSettings."""
+
+    def test_default_recv_window_ms(self) -> None:
+        """Default recvWindow should be 5000ms per Binance spec."""
+        settings = BinanceSettings(_env_file=None)
+        assert settings.recv_window_ms == 5000
+
+    def test_custom_recv_window_ms(self) -> None:
+        """recvWindow should be configurable for high-latency VPS."""
+        settings = BinanceSettings(recv_window_ms=10000, _env_file=None)
+        assert settings.recv_window_ms == 10000
+
+    def test_default_demo_mode(self) -> None:
+        """Default should be testnet mode (safety first)."""
+        settings = BinanceSettings(_env_file=None)
+        assert settings.testnet_mode is True
+        assert settings.demo_mode is True
+
+    def test_not_configured_by_default(self) -> None:
+        """Should not be configured without API keys."""
+        settings = BinanceSettings(_env_file=None)
+        assert settings.is_configured is False
+
+    def test_configured_with_keys(self) -> None:
+        """Should be configured when all keys are set."""
+        settings = BinanceSettings(
+            api_key="test-key",
+            api_secret="test-secret",
+            _env_file=None,
+        )
+        assert settings.is_configured is True
+
+    def test_secrets_not_exposed(self) -> None:
+        """API secrets should not be exposed in repr."""
+        settings = BinanceSettings(
+            api_key="super-secret-key",
+            api_secret="super-secret-secret",
+            _env_file=None,
+        )
+        repr_str = repr(settings)
+        assert "super-secret-key" not in repr_str
+        assert "super-secret-secret" not in repr_str
 
 
 class TestTelegramSettings:

@@ -93,14 +93,55 @@ class OKXAdapter(ExchangeAdapter):
         await self._rest.close()
         logger.info("okx_adapter_disconnected")
 
-    async def start_market_data_ws(self) -> None:
-        """Start public WebSocket for market data."""
+    async def start_market_data_ws(
+        self, market_ids: list[MarketId] | None = None
+    ) -> None:
+        """
+        Start public WebSocket for market data.
+
+        Args:
+            market_ids: Optional list of market IDs to subscribe immediately
+                (e.g., ["BTC-USDT", "ETH-USDT"]). If provided, ticker and
+                1H candle channels are subscribed for each market after the
+                connection is established.
+
+        [NEW-CR-1] Without market_ids, only the connection is opened but no
+        subscriptions are made. Call subscribe_market_ids() to subscribe
+        markets at a later time.
+        """
         if self._public_ws is None:
             self._public_ws = OKXWebSocketClient(self._settings, private=False)
             self._public_ws.on_message(self._handle_public_message)
             self._public_ws.on_disconnect(self._handle_disconnect)
         if self._public_ws_task is None or self._public_ws_task.done():
             self._public_ws_task = asyncio.create_task(self._public_ws.connect())
+
+        # [NEW-CR-1] Wait for connection then subscribe to channels
+        if market_ids:
+            await self._public_ws._wait_for_connected()
+            await self.subscribe_market_ids(market_ids)
+
+    async def subscribe_market_ids(self, market_ids: list[MarketId]) -> None:
+        """
+        [NEW-CR-1] Subscribe to ticker and 1H candle channels for given markets.
+
+        Sends a single SUBSCRIBE message with all channels. The WS client
+        tracks them for automatic re-subscription after reconnect.
+
+        Args:
+            market_ids: List of market IDs, e.g. ["BTC-USDT", "ETH-USDT"]
+        """
+        if self._public_ws is None:
+            raise RuntimeError(
+                "Public WebSocket not initialized. Call start_market_data_ws() first."
+            )
+        await self._public_ws._wait_for_connected()
+        channels: list[dict[str, str]] = []
+        for mid in market_ids:
+            channels.append({"channel": "tickers", "instId": mid})
+            channels.append({"channel": "candle1H", "instId": mid})
+        await self._public_ws.subscribe_many(channels)
+        logger.info("okx_subscribed_market_data", markets=len(market_ids))
 
     async def start_private_ws(self) -> None:
         """Start private WebSocket for order updates."""
@@ -110,6 +151,21 @@ class OKXAdapter(ExchangeAdapter):
             self._private_ws.on_disconnect(self._handle_disconnect)
         if self._private_ws_task is None or self._private_ws_task.done():
             self._private_ws_task = asyncio.create_task(self._private_ws.connect())
+
+    async def subscribe_private_channels(self, channels: list[str]) -> None:
+        """
+        [NEW-CR-1] Subscribe to private channels (orders, account, positions).
+
+        Args:
+            channels: List of channel names, e.g. ["orders", "account", "positions"]
+        """
+        if self._private_ws is None:
+            raise RuntimeError(
+                "Private WebSocket not initialized. Call start_private_ws() first."
+            )
+        await self._private_ws._wait_for_connected()
+        await self._private_ws.subscribe_many([{"channel": c} for c in channels])
+        logger.info("okx_subscribed_private", channels=len(channels))
 
     def _handle_disconnect(self) -> None:
         """Handle WebSocket disconnect - mark for reconciliation."""

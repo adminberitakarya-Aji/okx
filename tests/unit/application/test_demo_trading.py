@@ -26,6 +26,16 @@ from trading_grid.application.services.execution_engine import ExecutionEngine, 
 from trading_grid.application.services.grid_engine import GridEngine
 from trading_grid.domain.grid.models import Blueprint, Section
 from trading_grid.domain.market.models import Ticker
+from trading_grid.application.services.authorization import Identity, Role
+
+# [A-H12] Test identity (identity is REQUIRED).
+DEMO_IDENTITY = Identity(
+    identity_id="test-user",
+    identity_type="HUMAN",
+    role=Role.DEMO_OPERATOR,
+    allowed_environments=("DEMO",),
+)
+
 
 
 def create_test_blueprint(
@@ -256,7 +266,7 @@ class TestDemoTradingService:
         blueprint = create_test_blueprint()
         session = service.create_demo_grid(blueprint)
 
-        started = await service.start_demo_grid(session.session_id)
+        started = await service.start_demo_grid(session.session_id, identity=DEMO_IDENTITY)
         assert started.status == "RUNNING"
         assert started.started_at is not None
 
@@ -264,7 +274,7 @@ class TestDemoTradingService:
     async def test_start_demo_grid_not_found(self, service: DemoTradingService) -> None:
         """Test starting non-existent session raises error."""
         with pytest.raises(DemoTradingError) as exc_info:
-            await service.start_demo_grid("NONEXISTENT")
+            await service.start_demo_grid("NONEXISTENT", identity=DEMO_IDENTITY)
         assert "not found" in str(exc_info.value)
 
     @pytest.mark.asyncio
@@ -272,7 +282,7 @@ class TestDemoTradingService:
         """Test pausing a demo grid."""
         blueprint = create_test_blueprint()
         session = service.create_demo_grid(blueprint)
-        await service.start_demo_grid(session.session_id)
+        await service.start_demo_grid(session.session_id, identity=DEMO_IDENTITY)
 
         paused = service.pause_demo_grid(session.session_id)
         assert paused.status == "PAUSED"
@@ -283,7 +293,7 @@ class TestDemoTradingService:
         """Test resuming a paused demo grid."""
         blueprint = create_test_blueprint()
         session = service.create_demo_grid(blueprint)
-        await service.start_demo_grid(session.session_id)
+        await service.start_demo_grid(session.session_id, identity=DEMO_IDENTITY)
         service.pause_demo_grid(session.session_id)
 
         resumed = service.resume_demo_grid(session.session_id)
@@ -294,7 +304,7 @@ class TestDemoTradingService:
         """Test stopping a demo grid."""
         blueprint = create_test_blueprint()
         session = service.create_demo_grid(blueprint)
-        await service.start_demo_grid(session.session_id)
+        await service.start_demo_grid(session.session_id, identity=DEMO_IDENTITY)
 
         stopped = service.stop_demo_grid(session.session_id, reason="Test complete")
         assert stopped.status == "STOPPED"
@@ -305,7 +315,7 @@ class TestDemoTradingService:
         """Test emergency stopping a demo grid."""
         blueprint = create_test_blueprint()
         session = service.create_demo_grid(blueprint)
-        await service.start_demo_grid(session.session_id)
+        await service.start_demo_grid(session.session_id, identity=DEMO_IDENTITY)
 
         stopped = service.emergency_stop_demo_grid(session.session_id, reason="Critical error")
         assert stopped.status == "EMERGENCY_STOPPED"
@@ -319,8 +329,8 @@ class TestDemoTradingService:
 
         session1 = service.create_demo_grid(bp1)
         session2 = service.create_demo_grid(bp2)
-        await service.start_demo_grid(session1.session_id)
-        await service.start_demo_grid(session2.session_id)
+        await service.start_demo_grid(session1.session_id, identity=DEMO_IDENTITY)
+        await service.start_demo_grid(session2.session_id, identity=DEMO_IDENTITY)
 
         stopped = service.emergency_stop_all(reason="System emergency")
         assert len(stopped) == 2
@@ -335,7 +345,7 @@ class TestDemoTradingService:
 
         session1 = service.create_demo_grid(bp1)
         service.create_demo_grid(bp2)
-        await service.start_demo_grid(session1.session_id)
+        await service.start_demo_grid(session1.session_id, identity=DEMO_IDENTITY)
 
         active = service.active_sessions
         assert len(active) == 2  # CREATED and RUNNING are both active
@@ -349,7 +359,7 @@ class TestDemoTradingService:
         """
         blueprint = create_test_blueprint()
         session = service.create_demo_grid(blueprint)
-        await service.start_demo_grid(session.session_id)
+        await service.start_demo_grid(session.session_id, identity=DEMO_IDENTITY)
 
         # Initial entry already submitted 1 order
         initial_orders = session.metrics.orders_submitted
@@ -359,6 +369,7 @@ class TestDemoTradingService:
             market_id="BTC-USDT",
             side="BUY",
             quantity=Decimal("0.01"),
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is True
@@ -368,15 +379,23 @@ class TestDemoTradingService:
     @pytest.mark.asyncio
     async def test_execute_demo_order_passes_user_id(self, service: DemoTradingService) -> None:
         """Test execute_demo_order passes user_id to execution engine."""
+        # [A-H11] Identity must match the session owner (usr_1)
+        owner_identity = Identity(
+            identity_id="usr_1",
+            identity_type="HUMAN",
+            role=Role.DEMO_OPERATOR,
+            allowed_environments=("DEMO",),
+        )
         blueprint = create_test_blueprint()
         session = service.create_demo_grid(blueprint, user_id="usr_1")
-        await service.start_demo_grid(session.session_id)
+        await service.start_demo_grid(session.session_id, identity=owner_identity)
 
         await service.execute_demo_order(
             session_id=session.session_id,
             market_id="BTC-USDT",
             side="BUY",
             quantity=Decimal("0.01"),
+            identity=owner_identity,  # [A-H12] required
         )
 
         # Verify user_id was passed to execute_order
@@ -395,6 +414,7 @@ class TestDemoTradingService:
                 market_id="BTC-USDT",
                 side="BUY",
                 quantity=Decimal("0.01"),
+                identity=DEMO_IDENTITY,  # [A-H12] required
             )
         assert "RUNNING" in str(exc_info.value)
 
@@ -403,7 +423,7 @@ class TestDemoTradingService:
         """Test getting session metrics."""
         blueprint = create_test_blueprint()
         session = service.create_demo_grid(blueprint)
-        await service.start_demo_grid(session.session_id)
+        await service.start_demo_grid(session.session_id, identity=DEMO_IDENTITY)
 
         metrics = service.get_session_metrics(session.session_id)
         assert metrics is not None
@@ -417,8 +437,8 @@ class TestDemoTradingService:
 
         session1 = service.create_demo_grid(bp1)
         session2 = service.create_demo_grid(bp2)
-        await service.start_demo_grid(session1.session_id)
-        await service.start_demo_grid(session2.session_id)
+        await service.start_demo_grid(session1.session_id, identity=DEMO_IDENTITY)
+        await service.start_demo_grid(session2.session_id, identity=DEMO_IDENTITY)
 
         total = service.get_all_metrics()
         assert total.grid_state_transitions == 2
@@ -433,7 +453,7 @@ class TestDemoTradingService:
         """
         blueprint = create_test_blueprint()
         session = service.create_demo_grid(blueprint)
-        await service.start_demo_grid(session.session_id)
+        await service.start_demo_grid(session.session_id, identity=DEMO_IDENTITY)
 
         report = service.generate_validation_report()
 
@@ -447,7 +467,7 @@ class TestDemoTradingService:
         """Test validation report when ready for live."""
         blueprint = create_test_blueprint()
         session = service.create_demo_grid(blueprint)
-        await service.start_demo_grid(session.session_id)
+        await service.start_demo_grid(session.session_id, identity=DEMO_IDENTITY)
 
         # Simulate sufficient orders
         for _ in range(10):
@@ -471,7 +491,7 @@ class TestDemoTradingService:
         """Test service status summary."""
         blueprint = create_test_blueprint()
         session = service.create_demo_grid(blueprint)
-        await service.start_demo_grid(session.session_id)
+        await service.start_demo_grid(session.session_id, identity=DEMO_IDENTITY)
 
         status = service.get_service_status()
         assert status["environment"] == "DEMO"
@@ -614,7 +634,7 @@ class TestImmediateFirstEntry:
         blueprint = create_test_blueprint()
         session = service.create_demo_grid(blueprint)
 
-        started = await service.start_demo_grid(session.session_id)
+        started = await service.start_demo_grid(session.session_id, identity=DEMO_IDENTITY)
 
         # Verify order was executed
         assert started.status == "RUNNING"
@@ -644,7 +664,7 @@ class TestImmediateFirstEntry:
         session = service.create_demo_grid(blueprint)
 
         # First start — executes initial entry
-        await service.start_demo_grid(session.session_id)
+        await service.start_demo_grid(session.session_id, identity=DEMO_IDENTITY)
 
         # Verify idempotency key was passed
         call_kwargs = service._execution_engine.execute_order.call_args.kwargs
@@ -685,7 +705,7 @@ class TestImmediateFirstEntry:
         session = service.create_demo_grid(blueprint)
 
         # Grid should still start despite initial entry failure
-        started = await service.start_demo_grid(session.session_id)
+        started = await service.start_demo_grid(session.session_id, identity=DEMO_IDENTITY)
 
         assert started.status == "RUNNING"
         assert started.started_at is not None
@@ -712,7 +732,7 @@ class TestImmediateFirstEntry:
         blueprint = create_test_blueprint()
         session = service.create_demo_grid(blueprint)
 
-        await service.start_demo_grid(session.session_id)
+        await service.start_demo_grid(session.session_id, identity=DEMO_IDENTITY)
 
         # Verify reference_price was passed (current market price)
         call_kwargs = service._execution_engine.execute_order.call_args.kwargs
@@ -737,7 +757,7 @@ class TestImmediateFirstEntry:
         session = service.create_demo_grid(blueprint)
 
         # Grid should still start despite price fetch failure
-        started = await service.start_demo_grid(session.session_id)
+        started = await service.start_demo_grid(session.session_id, identity=DEMO_IDENTITY)
 
         assert started.status == "RUNNING"
 

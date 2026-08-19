@@ -149,8 +149,14 @@ class BinanceRestClient:
         query_params = dict(params or {})
         if signed:
             query_params["timestamp"] = str(int(time.time() * 1000))
-            query_params["recvWindow"] = "5000"
-            query_string = urlencode(query_params)
+            # [NEW-M-2] recvWindow is configurable via settings to handle
+            # high network latency on VPS deployments.
+            query_params["recvWindow"] = str(self._settings.recv_window_ms)
+            # NOTE: Params are sorted + url-encoded to match Binance signing spec.
+            # Binance requires the query string to be URL-encoded with sorted
+            # params so the server-side signature verification matches.
+            sorted_params = sorted(query_params.items())
+            query_string = urlencode(sorted_params)
             query_params["signature"] = self._sign_query(query_string)
 
         headers = self._get_auth_headers() if signed else {}
