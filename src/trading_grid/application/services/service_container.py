@@ -32,6 +32,7 @@ from trading_grid.application.services.exchange_factory import (
 )
 from trading_grid.application.services.execution_engine import ExecutionEngine
 from trading_grid.application.services.grid_engine import GridEngine
+from trading_grid.application.services.monitoring import MonitoringService
 from trading_grid.application.services.price_monitor import PriceMonitorService
 from trading_grid.application.services.research_service import ResearchService
 from trading_grid.application.services.risk_validation import RiskValidationService
@@ -95,6 +96,7 @@ class ServiceContainer:
         self._price_monitor: PriceMonitorService | None = None
         self._research_service: ResearchService | None = None
         self._approval_service: ApprovalService | None = None
+        self._monitoring_service: MonitoringService | None = None
 
     @property
     def exchange_id(self) -> str:
@@ -174,6 +176,13 @@ class ServiceContainer:
         if self._approval_service is None:
             self._approval_service = ApprovalService()
         return self._approval_service
+
+    @property
+    def monitoring_service(self) -> MonitoringService:
+        """Get the monitoring service (lazy init)."""
+        if self._monitoring_service is None:
+            self._monitoring_service = MonitoringService(environment="DEMO")
+        return self._monitoring_service
 
     async def start(self) -> None:
         """Start all background services."""

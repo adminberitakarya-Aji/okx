@@ -834,27 +834,27 @@ workers/ (depends on application, research)
 
 > **Reference:** `docs/ADMIN_DASHBOARD_SPEC.md`
 
-### Task 8.1: Telegram Admin Commands (Quick Win)
+### Task 8.1: Telegram Admin Commands (Quick Win) ✅ DONE (2026-08-19)
 ```
-- [ ] /admin ml_status — ML model status
-- [ ] /admin training — Training pipeline status
-- [ ] /admin performance — Grid performance summary
-- [ ] /admin retrain — Trigger retraining
-- [ ] /admin alerts — View active alerts
-- [ ] /admin ingestion — Data ingestion status
+- [x] /admin ml_status — ML model status
+- [x] /admin training — Training pipeline status
+- [x] /admin performance — Grid performance summary
+- [x] /admin retrain — Trigger retraining
+- [x] /admin alerts — View active alerts
+- [x] /admin ingestion — Data ingestion status
 ```
 
-### Task 8.2: Admin API Endpoints
+### Task 8.2: Admin API Endpoints ✅ DONE (2026-08-20)
 ```
-- [ ] GET /api/v1/admin/ml/status
-- [ ] GET /api/v1/admin/ml/metrics
-- [ ] GET /api/v1/admin/training/status
-- [ ] GET /api/v1/admin/training/history
-- [ ] POST /api/v1/admin/training/run
-- [ ] GET /api/v1/admin/performance/grids
-- [ ] GET /api/v1/admin/performance/alerts
-- [ ] GET /api/v1/admin/models
-- [ ] POST /api/v1/admin/models/{model_id}/promote
+- [x] GET /api/v1/admin/ml/status
+- [x] GET /api/v1/admin/ml/metrics
+- [x] GET /api/v1/admin/training/status
+- [x] GET /api/v1/admin/training/history
+- [x] POST /api/v1/admin/training/run
+- [x] GET /api/v1/admin/performance/grids
+- [x] GET /api/v1/admin/performance/alerts
+- [x] GET /api/v1/admin/models
+- [x] POST /api/v1/admin/models/{model_id}/promote
 ```
 
 ### Task 8.3: Metrics Storage
@@ -1243,3 +1243,4 @@ logger.info("order_submitted", order_id=order.id, market=market.id)
 | 1.6 | 2026-08-17 | AI Engineer | Phase 7 Task 7.1 clarification: checkboxes now distinguish "script implemented" vs "actually executed". Data fetching has NOT run yet (OKX API unreachable). Actual execution tracked in Task 7.4. |
 | 1.7 | 2026-08-17 | AI Engineer | Phase 7 Task 7.4 DONE: Data ingestion via Binance fallback (data-api.binance.vision) — 9/10 markets, 38,880 candles, 6 months. Feature engineering bug fixed (scalar assign to empty DataFrame → NaN). 6 LightGBM models trained (32,400 obs), evaluated, promoted to DEPLOYED (--force). Registry bug fixed (model_family enum deserialization). Val ROC-AUC ~0.53 (synthetic labels, expected). Task 7.5 (scheduled retraining) remains pending. |
 | 1.8 | 2026-08-18 | AI Engineer | Phase 7 Task 7.5 DONE: ml-scheduler service deployed to Proxmox (APScheduler, restart: unless-stopped). Weekly data refresh (Sun 02:00 UTC), monthly retraining (1st 03:00 UTC), weekly evaluation report (Mon 08:00 UTC). ResearchService ML mode verified + POST /research/reload-models endpoint added. Checklist audit: pre-commit hooks skipped (CI/CD sufficient), scripts consolidated, reserved commands/queries marked N/A, api/routes/research.py + grid.py marked done, deferred items marked. |
+| 1.9 | 2026-08-20 | AI Engineer | Phase 8 Tasks 8.1-8.2 DONE: Admin Telegram commands (6 sub-commands) + Admin API endpoints (10 total: ml/status, ml/metrics, training/status, training/history, training/run, performance/grids, performance/alerts, models, models/{id}/promote, ingestion/status). 51 integration tests passed. Remaining: Task 8.3 metrics storage, Task 8.4 alert system, Task 8.5 web dashboard. |

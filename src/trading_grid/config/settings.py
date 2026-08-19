@@ -317,6 +317,8 @@ class TelegramSettings(BaseSettings):
 
     bot_token: SecretStr = SecretStr("")
     allowed_user_ids: list[int] = Field(default_factory=list)
+    # [Phase 12] Admin user ID for /admin commands (SYSTEM_ADMIN level)
+    admin_user_id: int | None = None
     webhook_url: str | None = None
     polling_timeout: int = 30
     # Open access mode: any Telegram user can interact with the bot.

@@ -59,6 +59,7 @@ from trading_grid.infrastructure.telegram.handlers.callbacks import (
     callback_simulate_run,
     callback_unlink_confirm,
 )
+from trading_grid.infrastructure.telegram.handlers.admin_commands import cmd_admin
 from trading_grid.infrastructure.telegram.handlers.commands import (
     cmd_account,
     cmd_connect,
@@ -100,6 +101,8 @@ def register_handlers(
     dp.message.register(cmd_connect, Command("connect"))
     dp.message.register(cmd_disconnect, Command("disconnect"))
     dp.message.register(cmd_pair, Command("pair"))
+    # [Phase 12] Admin dashboard commands (SYSTEM_ADMIN only)
+    dp.message.register(cmd_admin, Command("admin"))
 
     # Callback handlers - Navigation
     dp.callback_query.register(callback_auth_create, F.data == "auth:create")

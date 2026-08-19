@@ -31,7 +31,7 @@ from trading_grid.api.schemas.grid import (
     GridRuntimeResponse,
     GridStartRequest,
 )
-from trading_grid.application.services.authorization import Identity
+from trading_grid.application.services.authorization import Identity, PermissionLevel
 
 logger = structlog.get_logger()
 
@@ -197,6 +197,19 @@ async def start_grid(
     - ``exchange`` query parameter specifies which exchange to use
     - Defaults to OKX for backward compatibility
     """
+    # [T-M5] RBAC: Grid start requires DEMO_OPERATOR (Level 2+)
+    if identity.permission_level < PermissionLevel.DEMO_OPERATOR:
+        logger.warning(
+            "grid_start_insufficient_permission",
+            identity_id=identity.identity_id,
+            permission_level=identity.permission_level,
+            required_level=PermissionLevel.DEMO_OPERATOR,
+        )
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden: DEMO_OPERATOR (Level 2+) role required to start grids",
+        )
+
     # [I-H11-REV] Get container for specified exchange (default OKX)
     if exchange is not None:
         exchange_upper = exchange.upper()

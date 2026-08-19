@@ -15,6 +15,8 @@ like ``from trading_grid.infrastructure.telegram.handlers import register_handle
 continue to work without changes.
 """
 
+from trading_grid.application.services.exchange_factory import ExchangeAdapterFactory
+from trading_grid.config.settings import get_settings
 from trading_grid.infrastructure.telegram.handlers._auth import (
     check_authorization,
     check_callback_authorization,
@@ -22,6 +24,7 @@ from trading_grid.infrastructure.telegram.handlers._auth import (
 )
 from trading_grid.infrastructure.telegram.handlers._state import (
     _get_editable_message,
+    _user_service,
     get_container_for_exchange,
     get_credential_service,
     get_multi_container,
@@ -85,10 +88,18 @@ from trading_grid.infrastructure.telegram.handlers.commands import (
     handle_unknown,
 )
 from trading_grid.infrastructure.telegram.handlers.registration import register_handlers
+from trading_grid.infrastructure.telegram.keyboards import grid_paused_keyboard
 
 __all__ = [
+    # config
+    "get_settings",
+    # exchange factory
+    "ExchangeAdapterFactory",
+    # keyboards
+    "grid_paused_keyboard",
     # _state
     "_get_editable_message",
+    "_user_service",
     "get_container_for_exchange",
     "get_credential_service",
     "get_multi_container",

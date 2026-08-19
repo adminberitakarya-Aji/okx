@@ -83,6 +83,53 @@ async def check_authorization(message: Message) -> bool:
     return False
 
 
+async def check_admin_authorization(message: Message) -> bool:
+    """
+    [Phase 12] Check if message sender is a SYSTEM_ADMIN.
+
+    Admin authorization is granted if:
+    1. User is the configured TELEGRAM_ADMIN_USER_ID, OR
+    2. User has SYSTEM_ADMIN role in the database (authorization_level >= 5)
+
+    This is stricter than check_authorization — open_access mode does NOT
+    grant admin access. Admin commands are always restricted.
+
+    Args:
+        message: Incoming message
+
+    Returns:
+        True if user is admin
+    """
+    if message.from_user is None:
+        return False
+
+    user_id = message.from_user.id
+    settings = get_settings()
+
+    # Check configured admin user ID
+    if settings.telegram.admin_user_id is not None and user_id == settings.telegram.admin_user_id:
+        return True
+
+    # Check database for SYSTEM_ADMIN role
+    user = await _user_service.get_user_by_telegram(user_id)
+    if user is not None and user.authorization_level >= 5:
+        return True
+
+    logger.warning(
+        "admin_access_denied",
+        user_id=user_id,
+        username=message.from_user.username,
+        command=message.text,
+    )
+    await message.answer(
+        "⛔ <b>Admin Access Required</b>\n\n"
+        "This command requires SYSTEM_ADMIN (Level 5) authorization.\n"
+        "Contact the system administrator if you need admin access.",
+        parse_mode="HTML",
+    )
+    return False
+
+
 async def check_callback_authorization(callback: CallbackQuery) -> bool:
     """
     Check if callback query sender is authorized.

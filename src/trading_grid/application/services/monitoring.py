@@ -212,7 +212,7 @@ class MonitoringService:
         """
         self._environment = environment
         self._alert_rules: dict[str, AlertRule] = {}
-        self._alerts: deque[Alert] = deque(maxlen=1000)
+        self._alerts: deque[Alert] = deque(maxlen=10000)
         self._health_checks: dict[str, HealthCheck] = {}
         self._metrics: dict[str, float] = {}
 

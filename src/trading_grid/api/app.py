@@ -27,6 +27,7 @@ from trading_grid.api.middleware.auth import AuthMiddleware
 from trading_grid.api.middleware.rate_limit import RateLimitMiddleware
 from trading_grid.api.routes import (
     account,
+    admin,
     approvals,
     blueprints,
     demo,
@@ -172,6 +173,8 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(pnl.router, prefix="/api/v1/pnl", tags=["P&L"])
     app.include_router(risk.router, prefix="/api/v1/risk", tags=["Risk"])
     app.include_router(approvals.router, prefix="/api/v1/approvals", tags=["Approvals"])
+    # [Phase 12] Admin dashboard endpoints (SYSTEM_ADMIN only)
+    app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 
 
 # Application instance for uvicorn

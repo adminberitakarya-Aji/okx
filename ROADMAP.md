@@ -496,7 +496,7 @@ M7.6: Scheduled retraining active                               ✅ Done (2026-0
 
 ---
 
-# 10. Phase 8: Admin Dashboard (Week 24-26)
+# 10. Phase 8: Admin Dashboard (Week 24-26) 🟡 IN PROGRESS
 
 ## Objective
 Provide developers/admins with monitoring and management tools for ML models, training pipeline, and bot performance.
@@ -507,8 +507,8 @@ Provide developers/admins with monitoring and management tools for ML models, tr
 
 | Deliverable | Description | Status |
 |---|---|---|
-| Telegram admin commands | Quick monitoring via /admin commands | ⬜ |
-| Admin API endpoints | REST API for admin operations | ⬜ |
+| Telegram admin commands | Quick monitoring via /admin commands | ✅ (2026-08-19) |
+| Admin API endpoints | REST API for admin operations | ✅ (2026-08-20) |
 | Metrics storage | Database tables for predictions, training runs | ⬜ |
 | Alert system | ML alerts via Telegram | ⬜ |
 | Web dashboard (future) | Grafana or custom web UI | ⬜ |
@@ -516,18 +516,18 @@ Provide developers/admins with monitoring and management tools for ML models, tr
 ## Milestones
 
 ```text
-M8.1: /admin ml_status command working
-M8.2: /admin training command working
-M8.3: /admin performance command working
-M8.4: Admin API endpoints implemented
-M8.5: Alert system active
+M8.1: /admin ml_status command working                    ✅ Done (2026-08-19)
+M8.2: /admin training command working                     ✅ Done (2026-08-19)
+M8.3: /admin performance command working                  ✅ Done (2026-08-19)
+M8.4: Admin API endpoints implemented                     ✅ Done (2026-08-20) — 10 endpoints
+M8.5: Alert system active                                 ⬜ (pending)
 ```
 
 ## Go/No-Go Criteria
-- ⬜ Admin can view ML model status
-- ⬜ Admin can trigger retraining
+- ✅ Admin can view ML model status
+- ✅ Admin can trigger retraining
 - ⬜ Admin receives alerts for model issues
-- ⬜ All admin operations are audit logged
+- ✅ All admin operations are audit logged
 
 ---
 
@@ -642,3 +642,4 @@ M8.5: Alert system active
 | 3.4 | 2026-08-17 | AI Engineer | Phase 7 milestone correction: M7.1/M7.2 clarified as "script created" (not data fetched/model trained). Added M7.3 (data ingestion run), renumbered M7.4-M7.6. Initial model and scheduled retraining remain ⬜ pending OKX API access. |
 | 3.5 | 2026-08-17 | AI Engineer | Phase 7 M7.3-M7.4 DONE: Data ingestion via Binance fallback (data-api.binance.vision) — 9 markets, 38,880 candles, 6 months. Feature engineering bug fixed (scalar assign to empty DataFrame). 6 LightGBM models trained (32,400 obs), evaluated, promoted to DEPLOYED. Registry bug fixed (model_family enum deserialization). Val ROC-AUC ~0.5 (synthetic labels, expected). ResearchService ML mode integration + scheduled retraining pending. |
 | 3.6 | 2026-08-18 | AI Engineer | Phase 7 M7.5-M7.6 DONE: ml-scheduler service deployed to Proxmox (APScheduler, restart: unless-stopped). Weekly data refresh (Sun 02:00 UTC), monthly retraining (1st 03:00 UTC), weekly evaluation report (Mon 08:00 UTC). ResearchService ML mode verified + POST /research/reload-models endpoint added. Phase 7 complete except admin notification. |
+| 3.7 | 2026-08-20 | AI Engineer | Phase 8 M8.1-M8.4 DONE: Admin Telegram commands (6 sub-commands) + Admin API endpoints (10 total: ml/status, ml/metrics, training/status, training/history, training/run, performance/grids, performance/alerts, models, models/{id}/promote, ingestion/status). 51 integration tests passed. Remaining: M8.5 alert system, Task 8.3 metrics storage, Task 8.4 alert push to Telegram. |

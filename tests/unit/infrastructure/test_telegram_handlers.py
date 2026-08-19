@@ -114,17 +114,23 @@ class TestGetUserService:
 
 class TestIsAuthorizedUser:
     def test_authorized_when_in_allowlist(self):
-        with patch.object(handlers, "get_settings") as mock_settings:
+        with patch(
+            "trading_grid.infrastructure.telegram.handlers._auth.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.telegram.allowed_user_ids = [12345]
             assert is_authorized_user(12345) is True
 
     def test_not_authorized_when_not_in_allowlist(self):
-        with patch.object(handlers, "get_settings") as mock_settings:
+        with patch(
+            "trading_grid.infrastructure.telegram.handlers._auth.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.telegram.allowed_user_ids = [99999]
             assert is_authorized_user(12345) is False
 
     def test_not_authorized_when_allowlist_empty(self):
-        with patch.object(handlers, "get_settings") as mock_settings:
+        with patch(
+            "trading_grid.infrastructure.telegram.handlers._auth.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.telegram.allowed_user_ids = []
             assert is_authorized_user(12345) is False
 
@@ -148,8 +154,13 @@ class TestCheckAuthorization:
     async def test_not_authorized(self):
         msg = _make_message(user_id=12345)
         with (
-            patch.object(handlers, "get_settings") as mock_settings,
-            patch.object(handlers, "is_authorized_user", return_value=False),
+            patch(
+                "trading_grid.infrastructure.telegram.handlers._auth.get_settings"
+            ) as mock_settings,
+            patch(
+                "trading_grid.infrastructure.telegram.handlers._auth.is_authorized_user",
+                return_value=False,
+            ),
             patch.object(handlers._user_service, "get_user_by_telegram", return_value=None),
         ):
             mock_settings.return_value.telegram.open_access = False
@@ -183,8 +194,13 @@ class TestCheckCallbackAuthorization:
     async def test_not_authorized(self):
         cb = _make_callback(user_id=12345)
         with (
-            patch.object(handlers, "get_settings") as mock_settings,
-            patch.object(handlers, "is_authorized_user", return_value=False),
+            patch(
+                "trading_grid.infrastructure.telegram.handlers._auth.get_settings"
+            ) as mock_settings,
+            patch(
+                "trading_grid.infrastructure.telegram.handlers._auth.is_authorized_user",
+                return_value=False,
+            ),
             patch.object(handlers._user_service, "get_user_by_telegram", return_value=None),
         ):
             mock_settings.return_value.telegram.open_access = False
@@ -232,14 +248,20 @@ class TestCmdStart:
 class TestCmdHelp:
     async def test_authorized(self):
         msg = _make_message()
-        with patch.object(handlers, "check_authorization", return_value=True):
+        with patch(
+            "trading_grid.infrastructure.telegram.handlers.commands.check_authorization",
+            return_value=True,
+        ):
             await cmd_help(msg)
         msg.answer.assert_called_once()
         assert "Available Commands" in msg.answer.call_args[0][0]
 
     async def test_not_authorized(self):
         msg = _make_message()
-        with patch.object(handlers, "check_authorization", return_value=False):
+        with patch(
+            "trading_grid.infrastructure.telegram.handlers.commands.check_authorization",
+            return_value=False,
+        ):
             await cmd_help(msg)
         msg.answer.assert_not_called()
 
@@ -545,10 +567,12 @@ class TestRegisterHandlers:
 
         register_handlers(dp)
 
-        # 9 command handlers (7 original + /connect + /disconnect from Phase 5)
-        assert dp.message.register.call_count == 9
-        # 37 callback handlers (includes all menus, sub-actions, and controls)
-        assert dp.callback_query.register.call_count == 37
+        # 11 command handlers: /start /help /menu /status /account /stop_all /exchange
+        # /connect /disconnect /pair (Phase 5) + /admin (Phase 12)
+        assert dp.message.register.call_count == 11
+        # 40 callback handlers (includes all menus, sub-actions, controls,
+        # and 3 approval callbacks from I-H7: approve/reject/confirm_live)
+        assert dp.callback_query.register.call_count == 40
 
 
 class TestMultiExchangeContainer:

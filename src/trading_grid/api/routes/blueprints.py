@@ -11,10 +11,14 @@ from decimal import Decimal
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 
 from trading_grid.api.routes.dependencies import get_current_identity, get_default_container
-from trading_grid.api.schemas.grid import BlueprintResponse, SectionResponse
+from trading_grid.api.schemas.grid import (
+    BlueprintGenerateRequest,
+    BlueprintResponse,
+    SectionResponse,
+)
 from trading_grid.application.services.authorization import Identity
 from trading_grid.domain.grid.models import Blueprint
 
@@ -88,10 +92,7 @@ async def get_blueprint(blueprint_id: str) -> BlueprintResponse:
 
 @router.post("/generate", response_model=BlueprintResponse, status_code=201)
 async def generate_blueprint(
-    # TODO [I-L5]: Migrate to request body (Pydantic model) instead of query params
-    # to support richer configuration options and align with REST best practices.
-    market_id: str = Query(..., description="Market ID (e.g., BTC-USDT)"),
-    capital: Decimal = Query(default=Decimal("1000"), description="Total capital allocation"),
+    request: BlueprintGenerateRequest,  # [I-L5] migrated to request body
     identity: Identity = Depends(get_current_identity),  # [I-C3] require identity
 ) -> BlueprintResponse:
     """
@@ -101,10 +102,15 @@ async def generate_blueprint(
     anchored to the current market price when available.
 
     [I-C3] The blueprint is owned by the authenticated identity.
+    [I-L5] Parameters are now passed via request body (Pydantic model)
+    instead of query params to support richer configuration options
+    and align with REST best practices.
     """
     container = get_default_container()
     service = container.research_service
 
+    market_id = request.market_id
+    capital = request.capital
     market_id_upper = market_id.upper()
 
     # Try to get current price from the exchange adapter

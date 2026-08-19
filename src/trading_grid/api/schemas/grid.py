@@ -81,6 +81,22 @@ class GridStartRequest(BaseModel):
     idempotency_key: str | None = Field(default=None, description="Idempotency key")
 
 
+class BlueprintGenerateRequest(BaseModel):
+    """
+    Request to generate a blueprint [I-L5].
+
+    Migrated from query params to request body to support richer
+    configuration options and align with REST best practices.
+    """
+
+    market_id: str = Field(..., description="Market ID (e.g., BTC-USDT)")
+    capital: Decimal = Field(
+        default=Decimal("1000"),
+        description="Total capital allocation",
+        gt=Decimal("0"),
+    )
+
+
 class GridControlResponse(BaseModel):
     """Response for grid control operations."""
 

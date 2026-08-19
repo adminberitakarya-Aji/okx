@@ -157,6 +157,16 @@ class ResearchService:
         """Whether ML models are loaded and available for ranking."""
         return self._ml_available
 
+    @property
+    def registry(self) -> ModelRegistry:
+        """Get the model registry (for admin dashboard)."""
+        return self._registry
+
+    @property
+    def loaded_models(self) -> dict[ModelType, TrainedModel]:
+        """Get loaded models (for admin dashboard)."""
+        return dict(self._loaded_models)
+
     # =========================================================================
     # ML MODEL MANAGEMENT
     # =========================================================================
