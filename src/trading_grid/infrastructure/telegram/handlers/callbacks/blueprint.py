@@ -116,7 +116,12 @@ async def callback_blueprint_view(callback: CallbackQuery) -> None:
         return
 
     try:
-        blueprint = await container.research_service.generate_blueprint(market_id=market_id)
+        ticker = await container.adapter.get_ticker(market_id)
+        current_price = ticker.last_price
+        blueprint = container.research_service.generate_default_blueprint(
+            market_id=market_id,
+            current_price=current_price,
+        )
         text = (
             f"🧠 <b>Blueprint Generated</b>\n"
             f"━━━━━━━━━━━━━━━━━━\n\n"

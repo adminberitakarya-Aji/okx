@@ -178,11 +178,8 @@ async def callback_grid_orders_all(callback: CallbackQuery) -> None:
     else:
         for session in sessions[:5]:
             grid_id = session.grid_runtime.grid_id
-            orders = (
-                session.grid_runtime.order_history[-5:]
-                if session.grid_runtime.order_history
-                else []
-            )
+            market_id = session.grid_runtime.market_id
+            orders = container.execution_engine.get_orders_for_market(market_id)[-5:]
             lines.append(f"<b>Grid {grid_id}:</b>")
             if orders:
                 for order in orders:
@@ -248,9 +245,12 @@ async def callback_grid_risk(callback: CallbackQuery) -> None:
 
     lines = ["🛡 <b>RISK STATUS</b>", "━━━━━━━━━━━━━━━━━━", ""]
     try:
-        risk_status = container.risk_service.get_current_risk_summary()
-        for key, val in risk_status.items():
-            lines.append(f"<b>{key}:</b> {val}")
+        portfolio = container.execution_engine.risk_validator.portfolio
+        lines.append(f"<b>Active Grids:</b> {portfolio.active_grids}")
+        lines.append(f"<b>Deployed Capital:</b> {portfolio.deployed_capital:.2f} USDT")
+        lines.append(f"<b>Total Exposure:</b> {portfolio.total_exposure:.2f} USDT")
+        lines.append(f"<b>Drawdown:</b> {portfolio.drawdown_pct:.2f}%")
+        lines.append(f"<b>Risk Level:</b> {portfolio.risk_level}")
     except Exception:
         lines.append("Risk status unavailable.")
 
@@ -281,7 +281,7 @@ async def callback_grid_orders_detail(callback: CallbackQuery) -> None:
         await callback.answer("Grid not found")
         return
 
-    orders = session.grid_runtime.order_history[-10:] if session.grid_runtime.order_history else []
+    orders = container.execution_engine.get_orders_for_market(session.grid_runtime.market_id)[-10:]
     lines = [f"📋 <b>Orders — {grid_id}</b>", "━━━━━━━━━━━━━━━━━━", ""]
     if orders:
         for order in orders:
@@ -322,8 +322,7 @@ async def callback_grid_pnl_detail(callback: CallbackQuery) -> None:
         f"📊 <b>P&L — {grid_id}</b>\n"
         f"━━━━━━━━━━━━━━━━━━\n\n"
         f"Realized P&L: {emoji} <b>{pnl:+.4f} USDT</b>\n"
-        f"Market: {session.grid_runtime.market_id}\n"
-        f"Cycles completed: {session.grid_runtime.completed_cycles}"
+        f"Market: {session.grid_runtime.market_id}"
     )
     await msg.edit_text(text, reply_markup=grid_detail_keyboard(grid_id=grid_id))
     await callback.answer()

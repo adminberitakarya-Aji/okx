@@ -73,14 +73,14 @@ async def cmd_start(message: Message) -> None:
         # [I-H5] Actually verify the pairing token — no longer a TODO stub
         if _user_service is not None:
             try:
-                user, is_new_binding = await _user_service.verify_pairing_token(
+                paired_user, is_new_binding = await _user_service.verify_pairing_token(
                     raw_token=token,
                     telegram_user_id=telegram_user_id,
                     chat_id=message.chat.id,
                 )
                 logger.info(
                     "pairing_token_verified",
-                    user_id=user.user_id,
+                    user_id=paired_user.user_id,
                     telegram_user_id=telegram_user_id,
                     is_new_binding=is_new_binding,
                 )
@@ -352,7 +352,7 @@ async def cmd_stop_all(message: Message) -> None:
 
     for exchange_id, container in containers_to_stop:
         try:
-            stopped = container.demo_service.emergency_stop(reason=reason)
+            stopped = container.demo_service.emergency_stop_all(reason=reason)
             if stopped:
                 all_stopped.extend(stopped)
                 exchange_counts[exchange_id] = len(stopped)
@@ -655,7 +655,10 @@ async def cmd_pair(message: Message) -> None:
         return
 
     # Build the deep link using the bot's username
-    bot_username = message.bot.username if message.bot else None
+    bot_username: str | None = None
+    if message.bot is not None:
+        bot_info = await message.bot.get_me()
+        bot_username = bot_info.username if bot_info else None
     if bot_username:
         deep_link = f"https://t.me/{bot_username}?start={raw_token}"
     else:

@@ -43,11 +43,9 @@ async def callback_account_balance(callback: CallbackQuery) -> None:
     try:
         balance = await container.adapter.get_balance()
         lines = ["💰 <b>ACCOUNT BALANCE</b>", "━━━━━━━━━━━━━━━━━━", ""]
-        for asset, amounts in balance.items():
-            total = amounts.get("total", 0)
-            available = amounts.get("available", 0)
-            if float(total) > 0:
-                lines.append(f"<b>{asset}:</b> {total:.4f} (avail: {available:.4f})")
+        for asset, amount in balance.items():
+            if float(amount) > 0:
+                lines.append(f"<b>{asset}:</b> {amount:.4f}")
         if len(lines) == 3:
             lines.append("No balance data.")
         await msg.edit_text("\n".join(lines), reply_markup=account_menu_keyboard())
@@ -100,12 +98,12 @@ async def callback_account_risk(callback: CallbackQuery) -> None:
         return
 
     try:
-        limits = container.risk_service.get_limits()
+        limits = container.execution_engine.risk_validator.limits
         lines = ["🛡 <b>RISK LIMITS</b>", "━━━━━━━━━━━━━━━━━━", ""]
-        lines.append(f"Max Active Grids: {limits.max_active_grids}")
+        lines.append(f"Max Active Grids: {limits.max_concurrent_grids}")
         lines.append(f"Max Capital/Grid: {limits.max_capital_per_grid} USDT")
-        lines.append(f"Max Total Exposure: {limits.max_total_exposure} USDT")
-        lines.append(f"Max Daily Loss: {limits.max_daily_loss_pct}%")
+        lines.append(f"Max Total Capital: {limits.max_total_capital} USDT")
+        lines.append(f"Max Drawdown: {limits.max_drawdown_pct}%")
         await msg.edit_text("\n".join(lines), reply_markup=account_menu_keyboard())
     except Exception as e:
         logger.error("account_risk_failed", error=str(e))

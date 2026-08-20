@@ -54,9 +54,9 @@ async def callback_approve_blueprint(callback: CallbackQuery) -> None:
     msg = _get_editable_message(callback)
 
     try:
-        await container.approval_service.approve(
+        container.approval_service.approve(
             approval_id=approval_id,
-            approver_id=str(callback.from_user.id),
+            approved_by=str(callback.from_user.id),
         )
         logger.info(
             "blueprint_approved_via_telegram",
@@ -102,9 +102,9 @@ async def callback_reject_blueprint(callback: CallbackQuery) -> None:
     msg = _get_editable_message(callback)
 
     try:
-        await container.approval_service.reject(
+        container.approval_service.reject(
             approval_id=approval_id,
-            rejector_id=str(callback.from_user.id),
+            rejected_by=str(callback.from_user.id),
             reason="Rejected via Telegram",
         )
         logger.info(
@@ -157,9 +157,9 @@ async def callback_confirm_live(callback: CallbackQuery) -> None:
 
     try:
         # Confirm the approval for live trading
-        await container.approval_service.approve(
+        container.approval_service.approve(
             approval_id=approval_id,
-            approver_id=str(callback.from_user.id),
+            approved_by=str(callback.from_user.id),
         )
         logger.info(
             "live_trading_confirmed_via_telegram",

@@ -55,12 +55,15 @@ ADMIN_HELP_TEXT = (
 )
 
 
-def _load_pipeline_state() -> dict | None:
+def _load_pipeline_state() -> dict[str, object] | None:
     """Load pipeline state from disk. Returns None if unavailable."""
     try:
         if _PIPELINE_STATE_PATH.exists():
             with _PIPELINE_STATE_PATH.open(encoding="utf-8") as f:
-                return json.load(f)
+                loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    return loaded
+                return None
     except Exception as e:
         logger.warning("pipeline_state_load_failed", error=str(e))
     return None
@@ -165,6 +168,10 @@ async def _admin_training(message: Message) -> None:
         )
         return
 
+    last_training: str | None = state.get("last_training")  # type: ignore[assignment]
+    last_ingest_train: str | None = state.get("last_ingest")  # type: ignore[assignment]
+    last_promotion: str | None = state.get("last_promotion")  # type: ignore[assignment]
+    trained_models: list[object] = state.get("trained_models", [])  # type: ignore[assignment]
     val_auc = state.get("val_roc_auc")
     wf_auc = state.get("walk_forward_mean_roc_auc")
 
@@ -172,19 +179,20 @@ async def _admin_training(message: Message) -> None:
         "📊 <b>Training Pipeline</b>",
         "━━━━━━━━━━━━━━━━━━",
         "",
-        f"Last Training: {_fmt_dt(state.get('last_training'))}",
-        f"Last Ingest: {_fmt_dt(state.get('last_ingest'))}",
-        f"Last Promotion: {_fmt_dt(state.get('last_promotion'))}",
+        f"Last Training: {_fmt_dt(last_training)}",
+        f"Last Ingest: {_fmt_dt(last_ingest_train)}",
+        f"Last Promotion: {_fmt_dt(last_promotion)}",
         "",
         f"Dataset: {state.get('dataset_observations', 0)} observations",
         f"Val ROC-AUC: {val_auc:.4f}" if val_auc else "Val ROC-AUC: —",
         f"Walk-Forward: {wf_auc:.4f}" if wf_auc else "Walk-Forward: —",
-        f"Models Trained: {len(state.get('trained_models', []))}",
+        f"Models Trained: {len(trained_models)}",
         f"Promoted: {state.get('promoted_model', '—')}",
     ]
 
-    notes = state.get("notes")
-    if notes:
+    notes_raw = state.get("notes")
+    if notes_raw:
+        notes: str = str(notes_raw)
         # Truncate long notes
         notes_short = notes[:200] + "..." if len(notes) > 200 else notes
         lines.append("")
@@ -346,8 +354,8 @@ async def _admin_ingestion(message: Message) -> None:
         )
         return
 
-    last_ingest = state.get("last_ingest")
-    markets = state.get("ingested_markets", [])
+    last_ingest: str | None = state.get("last_ingest")  # type: ignore[assignment]
+    markets: list[str] = state.get("ingested_markets", [])  # type: ignore[assignment]
     total_candles = state.get("total_candles", 0)
     candles_per_market = state.get("candles_per_market", 0)
     exchange = state.get("exchange", "—")

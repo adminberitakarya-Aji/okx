@@ -174,7 +174,8 @@ class ExchangeAdapterFactory:
             return settings.binance
         return settings.bybit  # BYBIT
 
-    def get_configured_exchanges(self, settings: Settings) -> list[ExchangeId]:
+    @staticmethod
+    def get_configured_exchanges(settings: Settings) -> list[ExchangeId]:
         """
         Get list of exchanges that have credentials configured.
 

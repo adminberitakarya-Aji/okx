@@ -12,7 +12,7 @@ The service container is wired at application startup
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from fastapi import HTTPException, Request
 
@@ -74,7 +74,7 @@ def get_current_identity(request: Request) -> Identity:
     Raises:
         HTTPException: 401 if no identity is attached
     """
-    identity = getattr(request.state, "identity", None)
+    identity = cast("Identity | None", getattr(request.state, "identity", None))
     if identity is None:
         raise HTTPException(
             status_code=401,

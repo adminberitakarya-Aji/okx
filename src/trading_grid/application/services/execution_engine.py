@@ -31,6 +31,7 @@ import structlog
 from trading_grid.application.services.authorization import (
     AuthorizationResult,
     Identity,
+    OperationType,
     PermissionLevel,
 )
 from trading_grid.application.services.risk_validation import RiskValidationService
@@ -127,7 +128,7 @@ class ExecutionEngine:
         user_id: str | None = None,
         active_grid_count: int = 0,
         idempotency_key: str | None = None,
-        identity: Identity = None,  # type: ignore[assignment]  # [A-H12] Required — no default
+        identity: Identity | None = None,  # [A-H12] Required — callers must provide
         skip_rate_limit: bool = False,
     ) -> ExecutionResult:
         """
@@ -633,7 +634,7 @@ class ExecutionEngine:
         # Check permission level based on environment
         if self.mode == "LIVE":
             required_level = PermissionLevel.LIVE_OPERATOR
-            operation = "LIVE_EXECUTE"
+            operation: OperationType = "LIVE_EXECUTE"
         else:
             required_level = PermissionLevel.DEMO_OPERATOR
             operation = "GRID_START"

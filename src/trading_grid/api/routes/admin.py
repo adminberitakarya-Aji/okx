@@ -18,7 +18,7 @@ import sys
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 import structlog
@@ -83,7 +83,7 @@ def _load_pipeline_state() -> dict[str, Any] | None:
     try:
         if _PIPELINE_STATE_PATH.exists():
             with _PIPELINE_STATE_PATH.open(encoding="utf-8") as f:
-                return json.load(f)
+                return cast("dict[str, Any]", json.load(f))
     except Exception as e:
         logger.warning("pipeline_state_load_failed", error=str(e))
     return None

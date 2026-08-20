@@ -6,8 +6,7 @@ This module provides schemas for:
 - Approval/rejection actions
 """
 
-from datetime import datetime
-from decimal import Decimal
+from datetime import UTC, datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -20,17 +19,17 @@ class ApprovalResponse(BaseModel):
     """Approval request detail response."""
 
     approval_id: str
-    approval_type: ApprovalType
+    operation_type: ApprovalType
     status: ApprovalStatus
     requested_by: str
-    approved_by: str | None = None
+    description: str = ""
+    operation_id: str | None = None
     blueprint_id: str | None = None
     market_id: str | None = None
     environment: str = "DEMO"
-    capital_allocation: Decimal | None = None
-    conditions: list[str] = Field(default_factory=list)
     reason: str | None = None
     requested_at: datetime | None = None
+    decided_by: str | None = None
     decided_at: datetime | None = None
     expires_at: datetime | None = None
 
@@ -57,5 +56,5 @@ class ApprovalActionResponse(BaseModel):
     action: Literal["APPROVE", "REJECT"]
     status: ApprovalStatus
     decided_by: str
-    decided_at: datetime = Field(default_factory=datetime.utcnow)
+    decided_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     reason: str | None = None

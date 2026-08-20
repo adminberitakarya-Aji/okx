@@ -14,7 +14,7 @@ Authorization: LEVEL 2+ (Demo Grid Control), LEVEL 3+ (Live Grid Control)
 
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Any, Literal
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -264,7 +264,9 @@ async def start_grid(
     )
 
 
-def _find_session_for_grid(grid_id: str, exchange: str | None = None):
+def _find_session_for_grid(
+    grid_id: str, exchange: str | None = None
+) -> tuple[Any, Any]:
     """
     Find the demo session for a grid ID across exchanges.
 
