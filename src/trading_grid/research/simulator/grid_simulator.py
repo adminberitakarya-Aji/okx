@@ -650,9 +650,9 @@ class GridSimulator:
         # Coin accumulation — count only lots bought during simulation
         # (excludes initial_asset_balance to avoid distorting avg acquisition price)
         traded_open_lots = [lot for lot in open_lots if lot.status == "OPEN"]
-        coin_accumulated = sum(lot.quantity for lot in traded_open_lots)
+        coin_accumulated = Decimal(sum(lot.quantity for lot in traded_open_lots))
         avg_acquisition: Decimal | None = None
-        total_cost = sum(lot.effective_buy_cost for lot in traded_open_lots)
+        total_cost = Decimal(sum(lot.effective_buy_cost for lot in traded_open_lots))
         if coin_accumulated > 0 and total_cost > 0:
             avg_acquisition = total_cost / coin_accumulated
 

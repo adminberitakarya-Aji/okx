@@ -409,7 +409,7 @@ class MonitoringService:
         Returns:
             List of alerts
         """
-        alerts = self._alerts
+        alerts = list(self._alerts)
 
         if severity is not None:
             alerts = [a for a in alerts if a.severity == severity]

@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     from fastapi import Request, Response
+    from starlette.types import ASGIApp
 
 logger = structlog.get_logger()
 
@@ -63,7 +64,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     def __init__(
         self,
-        app,  # type: ignore[type-arg]
+        app: ASGIApp,
         max_requests: int = _DEFAULT_MAX_REQUESTS,
         window_seconds: int = _DEFAULT_WINDOW_SECONDS,
     ) -> None:
