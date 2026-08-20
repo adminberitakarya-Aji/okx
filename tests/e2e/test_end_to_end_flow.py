@@ -12,24 +12,23 @@ Validates the full operational pipeline across all architectural layers:
 
 from datetime import UTC, datetime
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from trading_grid.application.services.authorization import Identity, Role
 from trading_grid.application.services.demo_trading import DemoTradingService
 from trading_grid.application.services.execution_engine import ExecutionEngine
 from trading_grid.application.services.grid_engine import GridEngine
 from trading_grid.application.services.price_monitor import PriceMonitorService
-from trading_grid.application.services.research_service import ResearchService
 from trading_grid.application.services.risk_validation import RiskValidationService
-from trading_grid.application.services.service_container import MultiExchangeContainer, ServiceContainer
+from trading_grid.application.services.service_container import (
+    MultiExchangeContainer,
+)
 from trading_grid.config.settings import Settings
-from trading_grid.domain.execution.models import Fill, Order
 from trading_grid.domain.grid.models import Blueprint, GridLevelModel, Section
-from trading_grid.domain.market.models import Candle, Market, OrderBook, OrderBookLevel, Ticker
+from trading_grid.domain.market.models import Ticker
 from trading_grid.domain.risk.models import RiskLimits
-from trading_grid.domain.shared.types import ExecutionMode, MarketId
-from trading_grid.application.services.authorization import Identity, Role
 
 # [A-H12] Test identity for execute_order (identity is REQUIRED).
 DEMO_IDENTITY = Identity(
@@ -72,7 +71,6 @@ async def test_complete_e2e_research_to_execution_flow():
     Research Blueprint -> Create Demo Grid -> Start Grid with Initial Entry ->
     Price Monitor Crossings -> Order Routing -> Realized PnL -> Emergency Stop.
     """
-    settings = Settings()
     grid_engine = GridEngine()
 
     # Setup Mock Adapter

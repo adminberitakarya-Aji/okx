@@ -159,6 +159,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         Decodes JWT token, verifies signature and expiry, and constructs Identity.
         """
         import jwt
+
         from trading_grid.config.settings import get_settings
 
         settings = get_settings()

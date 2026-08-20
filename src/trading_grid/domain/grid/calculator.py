@@ -31,8 +31,8 @@ from trading_grid.domain.shared.errors import (
     BlueprintValidationError,
 )
 from trading_grid.domain.shared.types import (
-    MAX_GRIDS_PER_SECTION,
     MAX_GRID_SPACING_PCT,
+    MAX_GRIDS_PER_SECTION,
     MAX_SECTIONS,
     MIN_GRID_SPACING_PCT,
     Price,

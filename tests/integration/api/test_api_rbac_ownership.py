@@ -13,22 +13,18 @@ use the actual FastAPI app with AuthMiddleware to verify the full HTTP stack.
 """
 
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from trading_grid.api.middleware.auth import AuthMiddleware, DEV_API_KEYS
+from trading_grid.api.middleware.auth import AuthMiddleware
 from trading_grid.api.routes.dependencies import (
-    get_current_identity,
-    get_default_container,
     get_multi_container,
     set_multi_container,
 )
-from trading_grid.application.services.authorization import Identity, Role
 from trading_grid.domain.grid.models import Blueprint
-
 
 # =============================================================================
 # Test Fixtures

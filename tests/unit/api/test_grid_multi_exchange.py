@@ -16,8 +16,8 @@ from fastapi import HTTPException
 from trading_grid.api.routes.grid import (
     VALID_EXCHANGES,
     _find_session_for_grid,
-    list_grids,
     get_grid,
+    list_grids,
 )
 from trading_grid.application.services.authorization import Identity, Role
 
@@ -228,7 +228,7 @@ class TestFindSessionForGrid:
         mock_multi.get_container.return_value = mock_container
 
         with patch("trading_grid.api.routes.grid.get_multi_container", return_value=mock_multi):
-            session, container = _find_session_for_grid("GRID-1", exchange=None)
+            session, _container = _find_session_for_grid("GRID-1", exchange=None)
             assert session is mock_session
             # Should have searched exchanges
             assert mock_multi.get_container.call_count >= 1

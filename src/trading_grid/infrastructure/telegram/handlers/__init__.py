@@ -91,37 +91,11 @@ from trading_grid.infrastructure.telegram.handlers.registration import register_
 from trading_grid.infrastructure.telegram.keyboards import grid_paused_keyboard
 
 __all__ = [
-    # config
-    "get_settings",
     # exchange factory
     "ExchangeAdapterFactory",
-    # keyboards
-    "grid_paused_keyboard",
     # _state
     "_get_editable_message",
     "_user_service",
-    "get_container_for_exchange",
-    "get_credential_service",
-    "get_multi_container",
-    "get_service_container",
-    "get_user_service",
-    "set_service_container",
-    # _auth
-    "check_authorization",
-    "check_callback_authorization",
-    "is_authorized_user",
-    # commands
-    "cmd_account",
-    "cmd_connect",
-    "cmd_disconnect",
-    "cmd_exchange",
-    "cmd_help",
-    "cmd_menu",
-    "cmd_pair",
-    "cmd_start",
-    "cmd_status",
-    "cmd_stop_all",
-    "handle_unknown",
     # callbacks
     "callback_account_balance",
     "callback_account_okx",
@@ -163,6 +137,32 @@ __all__ = [
     "callback_simulate_history",
     "callback_simulate_run",
     "callback_unlink_confirm",
+    # _auth
+    "check_authorization",
+    "check_callback_authorization",
+    # commands
+    "cmd_account",
+    "cmd_connect",
+    "cmd_disconnect",
+    "cmd_exchange",
+    "cmd_help",
+    "cmd_menu",
+    "cmd_pair",
+    "cmd_start",
+    "cmd_status",
+    "cmd_stop_all",
+    "get_container_for_exchange",
+    "get_credential_service",
+    "get_multi_container",
+    "get_service_container",
+    # config
+    "get_settings",
+    "get_user_service",
+    # keyboards
+    "grid_paused_keyboard",
+    "handle_unknown",
+    "is_authorized_user",
     # registration
     "register_handlers",
+    "set_service_container",
 ]

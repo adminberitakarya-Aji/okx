@@ -82,7 +82,7 @@ def _load_pipeline_state() -> dict[str, Any] | None:
     """Load pipeline state from disk. Returns None if unavailable."""
     try:
         if _PIPELINE_STATE_PATH.exists():
-            with open(_PIPELINE_STATE_PATH, encoding="utf-8") as f:
+            with _PIPELINE_STATE_PATH.open(encoding="utf-8") as f:
                 return json.load(f)
     except Exception as e:
         logger.warning("pipeline_state_load_failed", error=str(e))

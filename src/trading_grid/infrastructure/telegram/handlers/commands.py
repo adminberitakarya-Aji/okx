@@ -11,18 +11,17 @@ Extracted from the monolithic handlers module. Contains all /command handlers:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import structlog
-from aiogram.types import Message
 
 from trading_grid.application.services.authorization import Identity, Role
 from trading_grid.application.services.exchange_factory import (
     SUPPORTED_EXCHANGES,
     ExchangeAdapterFactory,
 )
-from trading_grid.application.services.service_container import ServiceContainer
 from trading_grid.config.settings import get_settings
 from trading_grid.infrastructure.telegram.formatters import (
-    format_account_status,
     format_main_menu,
     format_welcome_back,
     format_welcome_new_user,
@@ -40,6 +39,11 @@ from trading_grid.infrastructure.telegram.keyboards import (
     welcome_back_keyboard,
     welcome_new_user_keyboard,
 )
+
+if TYPE_CHECKING:
+    from aiogram.types import Message
+
+    from trading_grid.application.services.service_container import ServiceContainer
 
 logger = structlog.get_logger()
 

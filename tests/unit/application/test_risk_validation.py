@@ -15,12 +15,12 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from trading_grid.application.services.authorization import Identity, Role
 from trading_grid.application.services.execution_engine import ExecutionEngine
 from trading_grid.application.services.risk_validation import RiskValidationService
 from trading_grid.domain.execution.models import Position
 from trading_grid.domain.risk.models import PortfolioRisk, RiskLimits
 from trading_grid.infrastructure.okx.adapter import OKXAdapter
-from trading_grid.application.services.authorization import Identity, Role
 
 # [A-H12] Test identity for execute_order (identity is REQUIRED).
 DEMO_IDENTITY = Identity(

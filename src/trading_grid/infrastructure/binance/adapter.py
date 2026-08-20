@@ -33,13 +33,13 @@ from trading_grid.config.settings import BinanceSettings
 from trading_grid.domain.exchange.interface import ExchangeAdapter
 from trading_grid.domain.execution.models import Fill, Order, Position
 from trading_grid.domain.market.models import Candle, Market, OrderBook, OrderBookLevel, Ticker
-from trading_grid.domain.shared.types import ExchangeId, ExecutionMode, MarketId
-from trading_grid.infrastructure.binance.rest_client import BinanceAPIError, BinanceRestClient
-from trading_grid.infrastructure.binance.websocket_client import BinanceWebSocketClient
 from trading_grid.domain.market.symbols import (
     to_concatenated_symbol,
     to_normalized_market_id,
 )
+from trading_grid.domain.shared.types import ExchangeId, ExecutionMode, MarketId
+from trading_grid.infrastructure.binance.rest_client import BinanceAPIError, BinanceRestClient
+from trading_grid.infrastructure.binance.websocket_client import BinanceWebSocketClient
 
 logger = structlog.get_logger()
 

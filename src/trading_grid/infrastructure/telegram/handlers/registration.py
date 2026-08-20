@@ -8,15 +8,14 @@ handlers to the aiogram Dispatcher.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import structlog
 from aiogram import Dispatcher, F
 from aiogram.filters import Command, CommandStart
 
-from trading_grid.application.services.service_container import (
-    MultiExchangeContainer,
-    ServiceContainer,
-)
 from trading_grid.infrastructure.telegram.handlers._state import set_service_container
+from trading_grid.infrastructure.telegram.handlers.admin_commands import cmd_admin
 from trading_grid.infrastructure.telegram.handlers.callbacks import (
     callback_account_balance,
     callback_account_okx,
@@ -59,7 +58,6 @@ from trading_grid.infrastructure.telegram.handlers.callbacks import (
     callback_simulate_run,
     callback_unlink_confirm,
 )
-from trading_grid.infrastructure.telegram.handlers.admin_commands import cmd_admin
 from trading_grid.infrastructure.telegram.handlers.commands import (
     cmd_account,
     cmd_connect,
@@ -72,6 +70,12 @@ from trading_grid.infrastructure.telegram.handlers.commands import (
     cmd_status,
     cmd_stop_all,
 )
+
+if TYPE_CHECKING:
+    from trading_grid.application.services.service_container import (
+        MultiExchangeContainer,
+        ServiceContainer,
+    )
 
 logger = structlog.get_logger()
 

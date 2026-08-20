@@ -186,6 +186,7 @@ class TestGetTickerModel:
     async def test_get_ticker_converts_dict_to_ticker_instance(self) -> None:
         """ExchangeAdapter.get_ticker must parse raw dict into domain Ticker."""
         from unittest.mock import AsyncMock
+
         from trading_grid.config.settings import OKXSettings
         from trading_grid.domain.market.models import Ticker
 

@@ -28,7 +28,11 @@ from uuid import uuid4
 
 import structlog
 
-from trading_grid.application.services.authorization import Identity, PermissionLevel
+from trading_grid.application.services.authorization import (
+    AuthorizationResult,
+    Identity,
+    PermissionLevel,
+)
 from trading_grid.application.services.risk_validation import RiskValidationService
 from trading_grid.application.services.tenant_limits import (
     MaxGridsExceededError,
@@ -594,7 +598,7 @@ class ExecutionEngine:
         if avg_price:
             order.average_fill_price = Decimal(avg_price)
 
-    def _check_execution_authorization(self, identity: Identity) -> "AuthorizationResult":
+    def _check_execution_authorization(self, identity: Identity) -> AuthorizationResult:
         """
         [A-H7] Check if identity is authorized to execute orders.
 
@@ -610,8 +614,6 @@ class ExecutionEngine:
         Returns:
             AuthorizationResult with is_authorized and reason
         """
-        from trading_grid.application.services.authorization import AuthorizationResult
-
         # Check environment access
         if not identity.can_access_environment(self.mode):
             return AuthorizationResult(

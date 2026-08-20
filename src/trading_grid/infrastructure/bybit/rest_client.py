@@ -38,9 +38,7 @@ def _should_retry_http_error(exc: BaseException) -> bool:
     """Return True for transient network/server errors (429, 5xx, timeouts). Do NOT retry 4xx errors."""
     if isinstance(exc, httpx.HTTPStatusError):
         return exc.response.status_code == 429 or exc.response.status_code >= 500
-    if isinstance(exc, (httpx.TransportError, httpx.TimeoutException)):
-        return True
-    return False
+    return isinstance(exc, (httpx.TransportError, httpx.TimeoutException))
 
 
 class BybitAPIError(ExchangeAPIError):

@@ -10,8 +10,9 @@ Extracted from the monolithic callbacks.py. Contains:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import structlog
-from aiogram.types import CallbackQuery
 
 from trading_grid.infrastructure.telegram.formatters import (
     format_success,
@@ -26,6 +27,9 @@ from trading_grid.infrastructure.telegram.keyboards import (
     settings_menu_keyboard,
     unlink_confirmation_keyboard,
 )
+
+if TYPE_CHECKING:
+    from aiogram.types import CallbackQuery
 
 logger = structlog.get_logger()
 

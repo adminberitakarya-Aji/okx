@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from trading_grid.application.services.authorization import Identity, Role
 from trading_grid.application.services.demo_trading import (
     DemoGridSession,
     DemoMetrics,
@@ -26,7 +27,6 @@ from trading_grid.application.services.execution_engine import ExecutionEngine, 
 from trading_grid.application.services.grid_engine import GridEngine
 from trading_grid.domain.grid.models import Blueprint, Section
 from trading_grid.domain.market.models import Ticker
-from trading_grid.application.services.authorization import Identity, Role
 
 # [A-H12] Test identity (identity is REQUIRED).
 DEMO_IDENTITY = Identity(

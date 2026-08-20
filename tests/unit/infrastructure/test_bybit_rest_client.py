@@ -14,7 +14,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
-import tenacity
 
 from trading_grid.config.settings import BybitSettings
 from trading_grid.infrastructure.bybit.rest_client import (

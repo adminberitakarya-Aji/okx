@@ -23,12 +23,15 @@ import sys
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import structlog
-from aiogram.types import Message
 
 from trading_grid.infrastructure.telegram.handlers._auth import check_admin_authorization
 from trading_grid.infrastructure.telegram.handlers._state import get_service_container
+
+if TYPE_CHECKING:
+    from aiogram.types import Message
 
 logger = structlog.get_logger()
 
@@ -56,7 +59,7 @@ def _load_pipeline_state() -> dict | None:
     """Load pipeline state from disk. Returns None if unavailable."""
     try:
         if _PIPELINE_STATE_PATH.exists():
-            with open(_PIPELINE_STATE_PATH, encoding="utf-8") as f:
+            with _PIPELINE_STATE_PATH.open(encoding="utf-8") as f:
                 return json.load(f)
     except Exception as e:
         logger.warning("pipeline_state_load_failed", error=str(e))

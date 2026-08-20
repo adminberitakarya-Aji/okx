@@ -15,7 +15,6 @@ import pytest
 
 from trading_grid.infrastructure.telegram.handlers._auth import check_admin_authorization
 from trading_grid.infrastructure.telegram.handlers.admin_commands import (
-    ADMIN_HELP_TEXT,
     _admin_alerts,
     _admin_ingestion,
     _admin_ml_status,
@@ -80,9 +79,7 @@ def _make_container():
     return container
 
 
-# =============================================================================
-# Test: check_admin_authorization
-# =============================================================================
+# Section: check_admin_authorization tests
 
 
 class TestCheckAdminAuthorization:
@@ -229,9 +226,7 @@ class TestCmdAdminDispatch:
         msg.answer.assert_not_called()
 
 
-# =============================================================================
-# Test: _admin_ml_status
-# =============================================================================
+# Section: _admin_ml_status tests
 
 
 class TestAdminMLStatus:
@@ -270,9 +265,7 @@ class TestAdminMLStatus:
         assert "not initialized" in msg.answer.call_args[0][0]
 
 
-# =============================================================================
-# Test: _admin_training
-# =============================================================================
+# Section: _admin_training tests
 
 
 class TestAdminTraining:
@@ -321,9 +314,7 @@ class TestAdminTraining:
         assert "No pipeline state found" in msg.answer.call_args[0][0]
 
 
-# =============================================================================
-# Test: _admin_performance
-# =============================================================================
+# Section: _admin_performance tests
 
 
 class TestAdminPerformance:
@@ -371,9 +362,7 @@ class TestAdminPerformance:
         assert "+2.50" in text  # unrealized P&L
 
 
-# =============================================================================
-# Test: _admin_alerts
-# =============================================================================
+# Section: _admin_alerts tests
 
 
 class TestAdminAlerts:
@@ -454,9 +443,7 @@ class TestHelperFunctions:
         assert result is None
 
 
-# =============================================================================
-# Test: _admin_ingestion
-# =============================================================================
+# Section: _admin_ingestion tests
 
 
 class TestAdminIngestion:

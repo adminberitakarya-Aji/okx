@@ -10,8 +10,9 @@ Extracted from the monolithic callbacks.py. Contains:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import structlog
-from aiogram.types import CallbackQuery
 
 from trading_grid.config.settings import get_settings
 from trading_grid.infrastructure.telegram.handlers._auth import check_callback_authorization
@@ -19,6 +20,9 @@ from trading_grid.infrastructure.telegram.handlers._state import (
     _get_editable_message,
     get_service_container,
 )
+
+if TYPE_CHECKING:
+    from aiogram.types import CallbackQuery
 
 logger = structlog.get_logger()
 

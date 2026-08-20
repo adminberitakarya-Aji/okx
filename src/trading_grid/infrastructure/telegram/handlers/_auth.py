@@ -9,12 +9,15 @@ Extracted from the monolithic handlers.py. Provides:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import structlog
-from aiogram.types import CallbackQuery, Message
 
 from trading_grid.config.settings import get_settings
-
 from trading_grid.infrastructure.telegram.handlers._state import _user_service
+
+if TYPE_CHECKING:
+    from aiogram.types import CallbackQuery, Message
 
 logger = structlog.get_logger()
 

@@ -48,12 +48,12 @@ class TestAlembicMigrationGraph:
             rev_map[revision] = down_revision
         base_migrations = [rev for rev, down_rev in rev_map.items() if down_rev is None]
         assert len(base_migrations) == 1
-        for rev, down_rev in rev_map.items():
+        for _rev, down_rev in rev_map.items():
             if down_rev is not None:
                 assert down_rev in all_revisions
 
     def test_upgrade_and_downgrade_functions_defined(self):
         migrations = _get_migration_modules()
-        for revision, _, module in migrations:
-            assert hasattr(module, "upgrade") and callable(getattr(module, "upgrade"))
-            assert hasattr(module, "downgrade") and callable(getattr(module, "downgrade"))
+        for _revision, _, module in migrations:
+            assert hasattr(module, "upgrade") and callable(module.upgrade)
+            assert hasattr(module, "downgrade") and callable(module.downgrade)

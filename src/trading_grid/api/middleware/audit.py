@@ -17,13 +17,17 @@ from __future__ import annotations
 
 import json
 import time
-from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import structlog
-from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from fastapi import Request, Response
 
 logger = structlog.get_logger()
 

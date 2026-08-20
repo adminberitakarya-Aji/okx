@@ -19,7 +19,6 @@ from trading_grid.api.middleware.auth import AuthMiddleware
 from trading_grid.api.routes.dependencies import set_multi_container
 from trading_grid.application.services.demo_trading import DemoMetrics
 
-
 # =============================================================================
 # Test Fixtures
 # =============================================================================

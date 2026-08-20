@@ -19,12 +19,16 @@ from __future__ import annotations
 
 import time
 from collections import deque
-from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING
 
 import structlog
-from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from fastapi import Request, Response
 
 logger = structlog.get_logger()
 

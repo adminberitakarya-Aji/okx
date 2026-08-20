@@ -22,7 +22,7 @@ imports concrete adapters from infrastructure.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import structlog
 

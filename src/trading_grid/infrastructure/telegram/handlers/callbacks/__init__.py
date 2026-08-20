@@ -75,29 +75,20 @@ from trading_grid.infrastructure.telegram.handlers.callbacks.settings import (
 )
 
 __all__ = [
+    # account
+    "callback_account_balance",
+    "callback_account_okx",
+    "callback_account_pnl",
+    "callback_account_risk",
+    # approval
+    "callback_approve_blueprint",
     # nav
     "callback_auth_create",
-    "callback_nav_main",
-    # menu
-    "callback_menu_account",
-    "callback_menu_blueprint",
-    "callback_menu_grid",
-    "callback_menu_research",
-    "callback_menu_settings",
-    "callback_menu_simulate",
-    "callback_menu_top10",
-    # research
-    "callback_market_detail",
-    "callback_research_markets",
-    "callback_research_refresh",
-    "callback_research_top10",
-    "callback_simulate_history",
-    "callback_simulate_run",
     # blueprint
     "callback_blueprint_detail",
     "callback_blueprint_refresh",
     "callback_blueprint_view",
-    "callback_grid_start",
+    "callback_confirm_live",
     # grid
     "callback_grid_detail",
     "callback_grid_orders_all",
@@ -107,20 +98,29 @@ __all__ = [
     "callback_grid_pnl_detail",
     "callback_grid_resume",
     "callback_grid_risk",
+    "callback_grid_start",
     "callback_grid_stop",
-    # account
-    "callback_account_balance",
-    "callback_account_okx",
-    "callback_account_pnl",
-    "callback_account_risk",
+    # research
+    "callback_market_detail",
+    # menu
+    "callback_menu_account",
+    "callback_menu_blueprint",
+    "callback_menu_grid",
+    "callback_menu_research",
+    "callback_menu_settings",
+    "callback_menu_simulate",
+    "callback_menu_top10",
+    "callback_nav_main",
+    "callback_noop",
+    "callback_reject_blueprint",
+    "callback_research_markets",
+    "callback_research_refresh",
+    "callback_research_top10",
     # settings
     "callback_settings_environment",
     "callback_settings_notifications",
     "callback_settings_unlink",
+    "callback_simulate_history",
+    "callback_simulate_run",
     "callback_unlink_confirm",
-    # approval
-    "callback_approve_blueprint",
-    "callback_confirm_live",
-    "callback_noop",
-    "callback_reject_blueprint",
 ]

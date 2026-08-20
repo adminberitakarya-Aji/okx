@@ -10,8 +10,9 @@ Extracted from the monolithic callbacks.py. Contains:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import structlog
-from aiogram.types import CallbackQuery
 
 from trading_grid.application.services.authorization import Identity, Role
 from trading_grid.application.services.exchange_factory import ExchangeAdapterFactory
@@ -28,6 +29,9 @@ from trading_grid.infrastructure.telegram.keyboards import (
     blueprint_menu_keyboard,
     grid_detail_keyboard,
 )
+
+if TYPE_CHECKING:
+    from aiogram.types import CallbackQuery
 
 logger = structlog.get_logger()
 

@@ -13,12 +13,12 @@ import pytest
 
 from trading_grid.config.settings import BinanceSettings
 from trading_grid.domain.execution.models import Order
-from trading_grid.infrastructure.binance.adapter import BinanceAdapter
-from trading_grid.infrastructure.binance.rest_client import BinanceAPIError
 from trading_grid.domain.market.symbols import (
     to_concatenated_symbol,
     to_normalized_market_id,
 )
+from trading_grid.infrastructure.binance.adapter import BinanceAdapter
+from trading_grid.infrastructure.binance.rest_client import BinanceAPIError
 
 
 def _make_settings(testnet: bool = True) -> BinanceSettings:

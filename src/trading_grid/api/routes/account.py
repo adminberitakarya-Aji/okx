@@ -42,7 +42,7 @@ async def get_account() -> AccountResponse:
     # [I-L2] Fetch real balances from the exchange adapter
     try:
         balances = await container.adapter.get_balance()
-        for ccy, amount in balances.items():
+        for _, amount in balances.items():
             total_equity += amount
             available_balance += amount
         # Note: frozen balance is not available from the simplified

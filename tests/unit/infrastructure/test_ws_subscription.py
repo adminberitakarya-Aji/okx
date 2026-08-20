@@ -11,8 +11,7 @@ Verifies:
 
 import asyncio
 import json
-import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 from websockets.exceptions import ConnectionClosed
@@ -27,7 +26,6 @@ from trading_grid.infrastructure.binance.websocket_client import (
 )
 from trading_grid.infrastructure.bybit.websocket_client import BybitWebSocketClient
 from trading_grid.infrastructure.okx.websocket_client import OKXWebSocketClient
-
 
 # ---------------------------------------------------------------------------
 # Shared FakeWS
@@ -188,8 +186,9 @@ class TestOKXWaitForConnected:
         async def setter():
             await asyncio.sleep(0.01)
             client._connected.set()
-        asyncio.create_task(setter())
+        task = asyncio.create_task(setter())
         await client._wait_for_connected(timeout=1.0)  # should succeed
+        await task
 
     async def test_wait_for_connected_timeout(self):
         client = OKXWebSocketClient(_okx_settings(), private=False)
@@ -309,8 +308,9 @@ class TestBinanceWaitAndResubscribe:
         async def setter():
             await asyncio.sleep(0.01)
             client._connected.set()
-        asyncio.create_task(setter())
+        task = asyncio.create_task(setter())
         await client._wait_for_connected(timeout=1.0)
+        await task
 
     async def test_resubscribe_all_sends_tracked(self):
         client = BinanceWebSocketClient(_binance_settings(), private=False)

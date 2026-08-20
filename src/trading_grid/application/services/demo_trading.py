@@ -422,18 +422,21 @@ class DemoTradingService:
 
         # [A-H11] OWNERSHIP CHECK — only the session owner (or SYSTEM)
         # may start the grid. Coupled with I-C3 (route ownership check).
-        if session.user_id is not None and identity.identity_type != "SYSTEM":
-            if session.user_id != identity.identity_id:
-                logger.warning(
-                    "unauthorized_start_demo_grid",
-                    session_id=session_id,
-                    owner_user_id=session.user_id,
-                    attempted_user_id=identity.identity_id,
-                )
-                raise PermissionError(
-                    f"User {identity.identity_id} cannot start session {session_id} "
-                    f"owned by {session.user_id}"
-                )
+        if (
+            session.user_id is not None
+            and identity.identity_type != "SYSTEM"
+            and session.user_id != identity.identity_id
+        ):
+            logger.warning(
+                "unauthorized_start_demo_grid",
+                session_id=session_id,
+                owner_user_id=session.user_id,
+                attempted_user_id=identity.identity_id,
+            )
+            raise PermissionError(
+                f"User {identity.identity_id} cannot start session {session_id} "
+                f"owned by {session.user_id}"
+            )
 
         # STEP 1: Start the grid (transition to RUNNING first for session state atomicity)
         try:
