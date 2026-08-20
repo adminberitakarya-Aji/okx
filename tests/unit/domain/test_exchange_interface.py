@@ -193,13 +193,15 @@ class TestGetTickerModel:
         settings = OKXSettings(api_key="k", api_secret="s", passphrase="p", _env_file=None)
         adapter = OKXAdapter(settings)
         # Mock the underlying REST client to return raw exchange data
-        adapter._rest.get_ticker = AsyncMock(return_value={
-            "instId": "BTC-USDT",
-            "last": "65000.5",
-            "bidPx": "65000.0",
-            "askPx": "65001.0",
-            "vol24h": "1234.5",
-        })
+        adapter._rest.get_ticker = AsyncMock(
+            return_value={
+                "instId": "BTC-USDT",
+                "last": "65000.5",
+                "bidPx": "65000.0",
+                "askPx": "65001.0",
+                "vol24h": "1234.5",
+            }
+        )
 
         ticker = await adapter.get_ticker("BTC-USDT")
         assert isinstance(ticker, Ticker)
@@ -208,4 +210,3 @@ class TestGetTickerModel:
         assert ticker.bid_price == Decimal("65000.0")
         assert ticker.ask_price == Decimal("65001.0")
         assert ticker.volume_24h == Decimal("1234.5")
-

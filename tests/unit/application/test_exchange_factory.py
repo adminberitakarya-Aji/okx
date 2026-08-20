@@ -371,9 +371,7 @@ class TestCreateForUser:
         cred_service = self._make_credential_service(cred)
         factory = make_factory()
 
-        adapter = await factory.create_for_user(
-            "OKX", "usr_1", "DEMO", cred_service, settings
-        )
+        adapter = await factory.create_for_user("OKX", "usr_1", "DEMO", cred_service, settings)
 
         assert isinstance(adapter, OKXAdapter)
         assert adapter.exchange_id == "OKX"
@@ -394,9 +392,7 @@ class TestCreateForUser:
         cred_service = self._make_credential_service(cred)
         factory = make_factory()
 
-        adapter = await factory.create_for_user(
-            "BINANCE", "usr_1", "DEMO", cred_service, settings
-        )
+        adapter = await factory.create_for_user("BINANCE", "usr_1", "DEMO", cred_service, settings)
 
         assert isinstance(adapter, BinanceAdapter)
         assert adapter.exchange_id == "BINANCE"
@@ -410,9 +406,7 @@ class TestCreateForUser:
         cred_service = self._make_credential_service(cred)
         factory = make_factory()
 
-        adapter = await factory.create_for_user(
-            "BYBIT", "usr_1", "DEMO", cred_service, settings
-        )
+        adapter = await factory.create_for_user("BYBIT", "usr_1", "DEMO", cred_service, settings)
 
         assert isinstance(adapter, BybitAdapter)
         assert adapter.exchange_id == "BYBIT"
@@ -426,9 +420,7 @@ class TestCreateForUser:
         cred_service = self._make_credential_service(cred)
         factory = make_factory()
 
-        adapter = await factory.create_for_user(
-            "BINANCE", "usr_1", "LIVE", cred_service, settings
-        )
+        adapter = await factory.create_for_user("BINANCE", "usr_1", "LIVE", cred_service, settings)
 
         assert adapter.mode == "LIVE"
 
@@ -474,9 +466,7 @@ class TestCreateForUser:
         factory = make_factory()
 
         with pytest.raises(ValueError, match="Invalid environment"):
-            await factory.create_for_user(
-                "OKX", "usr_1", "STAGING", cred_service, settings
-            )
+            await factory.create_for_user("OKX", "usr_1", "STAGING", cred_service, settings)
 
     @pytest.mark.asyncio
     async def test_missing_credential_propagates_not_found(self) -> None:
@@ -490,9 +480,7 @@ class TestCreateForUser:
         factory = make_factory()
 
         with pytest.raises(CredentialNotFoundError):
-            await factory.create_for_user(
-                "OKX", "usr_1", "DEMO", cred_service, settings
-            )
+            await factory.create_for_user("OKX", "usr_1", "DEMO", cred_service, settings)
 
     @pytest.mark.asyncio
     async def test_user_credentials_do_not_leak_to_system_settings(self) -> None:

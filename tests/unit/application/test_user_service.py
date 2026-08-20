@@ -582,7 +582,11 @@ class TestCreatePairingSession:
         assert session.add.call_count == 2
         session.commit.assert_awaited()
 
-        pairing_model = next(c.args[0] for c in session.add.call_args_list if isinstance(c.args[0], PairingSessionModel))
+        pairing_model = next(
+            c.args[0]
+            for c in session.add.call_args_list
+            if isinstance(c.args[0], PairingSessionModel)
+        )
         assert pairing_model.user_id == "usr_abc123"
         assert pairing_model.status == "PENDING"
         # Token hash matches raw token
@@ -596,7 +600,11 @@ class TestCreatePairingSession:
 
         await service.create_pairing_session("usr_abc123", expiry_minutes=5)
 
-        pairing_model = next(c.args[0] for c in session.add.call_args_list if isinstance(c.args[0], PairingSessionModel))
+        pairing_model = next(
+            c.args[0]
+            for c in session.add.call_args_list
+            if isinstance(c.args[0], PairingSessionModel)
+        )
         # Expiry should be ~5 minutes from now
         expected_expiry = datetime.now(UTC) + timedelta(minutes=5)
         assert abs((pairing_model.expires_at - expected_expiry).total_seconds()) < 5

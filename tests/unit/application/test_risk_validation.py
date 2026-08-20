@@ -31,7 +31,6 @@ DEMO_IDENTITY = Identity(
 )
 
 
-
 def make_limits(**overrides: object) -> RiskLimits:
     """Create risk limits with optional overrides."""
     defaults: dict[str, object] = {
@@ -238,7 +237,7 @@ class TestExecutionEngineRiskWiring:
             side="BUY",
             quantity=Decimal("0.001"),
             price=Decimal("50000"),
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is True
@@ -255,7 +254,7 @@ class TestExecutionEngineRiskWiring:
             side="BUY",
             quantity=Decimal("0.01"),
             price=Decimal("50000"),  # notional 500 > 100 per-grid limit
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is False
@@ -274,7 +273,7 @@ class TestExecutionEngineRiskWiring:
             side="SELL",
             quantity=Decimal("0.001"),
             price=Decimal("50000"),
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is False
@@ -292,7 +291,7 @@ class TestExecutionEngineRiskWiring:
             side="BUY",
             quantity=Decimal("0.01"),
             price=Decimal("50000"),
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         order = engine.get_order(result.order_id)

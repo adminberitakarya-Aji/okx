@@ -622,4 +622,3 @@ class TestCredentialRBAC:
             identity=admin,
         )
         assert cred.api_key == "key"
-

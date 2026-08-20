@@ -146,18 +146,14 @@ class TestAdminRBAC:
     """Verify admin endpoints require SYSTEM_ADMIN (Level 5)."""
 
     @pytest.mark.parametrize("endpoint", ADMIN_ENDPOINTS)
-    def test_viewer_denied_on_admin_endpoints(
-        self, client: TestClient, endpoint: str
-    ) -> None:
+    def test_viewer_denied_on_admin_endpoints(self, client: TestClient, endpoint: str) -> None:
         """VIEWER role gets 403 on all admin endpoints."""
         response = client.get(endpoint, headers=VIEWER_HEADERS)
         assert response.status_code == 403
         assert "SYSTEM_ADMIN" in response.json()["detail"]
 
     @pytest.mark.parametrize("endpoint", ADMIN_ENDPOINTS)
-    def test_operator_denied_on_admin_endpoints(
-        self, client: TestClient, endpoint: str
-    ) -> None:
+    def test_operator_denied_on_admin_endpoints(self, client: TestClient, endpoint: str) -> None:
         """DEMO_OPERATOR role gets 403 on all admin endpoints."""
         response = client.get(endpoint, headers=OPERATOR_HEADERS)
         assert response.status_code == 403
@@ -165,16 +161,12 @@ class TestAdminRBAC:
 
     def test_viewer_denied_training_run(self, client: TestClient) -> None:
         """VIEWER cannot trigger training runs."""
-        response = client.post(
-            "/api/v1/admin/training/run", json={}, headers=VIEWER_HEADERS
-        )
+        response = client.post("/api/v1/admin/training/run", json={}, headers=VIEWER_HEADERS)
         assert response.status_code == 403
 
     def test_operator_denied_training_run(self, client: TestClient) -> None:
         """DEMO_OPERATOR cannot trigger training runs."""
-        response = client.post(
-            "/api/v1/admin/training/run", json={}, headers=OPERATOR_HEADERS
-        )
+        response = client.post("/api/v1/admin/training/run", json={}, headers=OPERATOR_HEADERS)
         assert response.status_code == 403
 
 
@@ -217,9 +209,7 @@ class TestTrainingStatusEndpoint:
 
     def test_training_status_graceful_when_no_state(self, client: TestClient) -> None:
         """Training status returns gracefully when pipeline state missing."""
-        with patch(
-            "trading_grid.api.routes.admin._load_pipeline_state", return_value=None
-        ):
+        with patch("trading_grid.api.routes.admin._load_pipeline_state", return_value=None):
             response = client.get("/api/v1/admin/training/status", headers=ADMIN_HEADERS)
             assert response.status_code == 200
             data = response.json()
@@ -242,9 +232,7 @@ class TestTrainingRunEndpoint:
         mock_proc.returncode = 0
 
         with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=mock_proc)):
-            response = client.post(
-                "/api/v1/admin/training/run", json={}, headers=ADMIN_HEADERS
-            )
+            response = client.post("/api/v1/admin/training/run", json={}, headers=ADMIN_HEADERS)
 
         assert response.status_code == 202
         data = response.json()
@@ -265,9 +253,7 @@ class TestTrainingRunEndpoint:
         admin_module._training_tasks["TRAIN-TEST"] = loop_task
 
         try:
-            response = client.post(
-                "/api/v1/admin/training/run", json={}, headers=ADMIN_HEADERS
-            )
+            response = client.post("/api/v1/admin/training/run", json={}, headers=ADMIN_HEADERS)
             assert response.status_code == 202
             data = response.json()
             assert data["status"] == "already_running"
@@ -286,9 +272,7 @@ class TestGridPerformanceEndpoint:
 
     def test_admin_can_get_grid_performance(self, client: TestClient) -> None:
         """SYSTEM_ADMIN can access grid performance summary."""
-        response = client.get(
-            "/api/v1/admin/performance/grids", headers=ADMIN_HEADERS
-        )
+        response = client.get("/api/v1/admin/performance/grids", headers=ADMIN_HEADERS)
         assert response.status_code == 200
         data = response.json()
         assert data["environment"] == "DEMO"
@@ -318,9 +302,7 @@ class TestGridPerformanceEndpoint:
         metrics.orders_filled = 8
         multi.default_container.demo_service.get_all_metrics.return_value = metrics
 
-        response = client.get(
-            "/api/v1/admin/performance/grids", headers=ADMIN_HEADERS
-        )
+        response = client.get("/api/v1/admin/performance/grids", headers=ADMIN_HEADERS)
         assert response.status_code == 200
         summary = response.json()["summary"]
         assert summary["total_sessions"] == 1
@@ -368,12 +350,8 @@ class TestIngestionStatusEndpoint:
 
     def test_ingestion_status_graceful_when_no_state(self, client: TestClient) -> None:
         """Ingestion status returns gracefully when pipeline state missing."""
-        with patch(
-            "trading_grid.api.routes.admin._load_pipeline_state", return_value=None
-        ):
-            response = client.get(
-                "/api/v1/admin/ingestion/status", headers=ADMIN_HEADERS
-            )
+        with patch("trading_grid.api.routes.admin._load_pipeline_state", return_value=None):
+            response = client.get("/api/v1/admin/ingestion/status", headers=ADMIN_HEADERS)
             assert response.status_code == 200
             data = response.json()
             assert data["pipeline_state_available"] is False
@@ -392,9 +370,7 @@ class TestIngestionStatusEndpoint:
             "trading_grid.api.routes.admin._load_pipeline_state",
             return_value=mock_state,
         ):
-            response = client.get(
-                "/api/v1/admin/ingestion/status", headers=ADMIN_HEADERS
-            )
+            response = client.get("/api/v1/admin/ingestion/status", headers=ADMIN_HEADERS)
             assert response.status_code == 200
             data = response.json()
             assert data["pipeline_state_available"] is True
@@ -414,9 +390,7 @@ class TestModelPromoteEndpoint:
 
     def test_promote_requires_auth(self, client: TestClient) -> None:
         """Promote endpoint requires authentication."""
-        response = client.post(
-            "/api/v1/admin/models/test-model/promote", json={"force": False}
-        )
+        response = client.post("/api/v1/admin/models/test-model/promote", json={"force": False})
         assert response.status_code == 401
 
     def test_promote_requires_admin(self, client: TestClient) -> None:
@@ -433,9 +407,7 @@ class TestModelPromoteEndpoint:
         mock_registry = MagicMock()
         mock_registry.get.return_value = None
 
-        with patch(
-            "trading_grid.api.routes.admin.get_default_container"
-        ) as mock_container:
+        with patch("trading_grid.api.routes.admin.get_default_container") as mock_container:
             mock_container.return_value.research_service.registry = mock_registry
             response = client.post(
                 "/api/v1/admin/models/nonexistent-model/promote",
@@ -457,9 +429,7 @@ class TestModelPromoteEndpoint:
         mock_registry.get.return_value = mock_entry
         mock_registry.promote.return_value = (True, [])
 
-        with patch(
-            "trading_grid.api.routes.admin.get_default_container"
-        ) as mock_container:
+        with patch("trading_grid.api.routes.admin.get_default_container") as mock_container:
             mock_container.return_value.research_service.registry = mock_registry
             response = client.post(
                 "/api/v1/admin/models/test-model/promote",
@@ -481,9 +451,7 @@ class TestModelPromoteEndpoint:
         mock_registry.get.return_value = mock_entry
         mock_registry.promote.return_value = (False, ["ROC-AUC below threshold"])
 
-        with patch(
-            "trading_grid.api.routes.admin.get_default_container"
-        ) as mock_container:
+        with patch("trading_grid.api.routes.admin.get_default_container") as mock_container:
             mock_container.return_value.research_service.registry = mock_registry
             response = client.post(
                 "/api/v1/admin/models/test-model/promote",
@@ -507,9 +475,7 @@ class TestModelPromoteEndpoint:
         mock_registry.get.return_value = mock_entry
         mock_registry.promote.return_value = (True, ["ROC-AUC below threshold"])
 
-        with patch(
-            "trading_grid.api.routes.admin.get_default_container"
-        ) as mock_container:
+        with patch("trading_grid.api.routes.admin.get_default_container") as mock_container:
             mock_container.return_value.research_service.registry = mock_registry
             response = client.post(
                 "/api/v1/admin/models/test-model/promote",
@@ -629,12 +595,8 @@ class TestTrainingHistoryEndpoint:
 
     def test_training_history_graceful_when_no_state(self, client: TestClient) -> None:
         """Training history returns empty when pipeline state missing."""
-        with patch(
-            "trading_grid.api.routes.admin._load_pipeline_state", return_value=None
-        ):
-            response = client.get(
-                "/api/v1/admin/training/history", headers=ADMIN_HEADERS
-            )
+        with patch("trading_grid.api.routes.admin._load_pipeline_state", return_value=None):
+            response = client.get("/api/v1/admin/training/history", headers=ADMIN_HEADERS)
             assert response.status_code == 200
             data = response.json()
             assert data["total_runs"] == 0
@@ -652,9 +614,7 @@ class TestTrainingHistoryEndpoint:
             "trading_grid.api.routes.admin._load_pipeline_state",
             return_value=mock_state,
         ):
-            response = client.get(
-                "/api/v1/admin/training/history", headers=ADMIN_HEADERS
-            )
+            response = client.get("/api/v1/admin/training/history", headers=ADMIN_HEADERS)
             assert response.status_code == 200
             data = response.json()
             assert data["total_runs"] == 1

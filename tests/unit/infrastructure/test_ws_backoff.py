@@ -16,13 +16,17 @@ class TestWsReconnectDelay:
 
     def test_attempt_zero_returns_base(self):
         """Attempt 0 should return ~base delay."""
-        with patch("trading_grid.infrastructure._common.ws_backoff.random.uniform", return_value=0.0):
+        with patch(
+            "trading_grid.infrastructure._common.ws_backoff.random.uniform", return_value=0.0
+        ):
             delay = ws_reconnect_delay(0)
         assert delay == 1.0
 
     def test_exponential_growth(self):
         """Delay should grow exponentially with attempt."""
-        with patch("trading_grid.infrastructure._common.ws_backoff.random.uniform", return_value=0.0):
+        with patch(
+            "trading_grid.infrastructure._common.ws_backoff.random.uniform", return_value=0.0
+        ):
             d0 = ws_reconnect_delay(0)
             d1 = ws_reconnect_delay(1)
             d2 = ws_reconnect_delay(2)
@@ -34,7 +38,9 @@ class TestWsReconnectDelay:
 
     def test_capped_at_max_delay(self):
         """Delay should be capped at max_delay."""
-        with patch("trading_grid.infrastructure._common.ws_backoff.random.uniform", return_value=0.0):
+        with patch(
+            "trading_grid.infrastructure._common.ws_backoff.random.uniform", return_value=0.0
+        ):
             d6 = ws_reconnect_delay(6)
             d7 = ws_reconnect_delay(7)
             d10 = ws_reconnect_delay(10)
@@ -44,7 +50,9 @@ class TestWsReconnectDelay:
 
     def test_custom_base(self):
         """Custom base should scale delays."""
-        with patch("trading_grid.infrastructure._common.ws_backoff.random.uniform", return_value=0.0):
+        with patch(
+            "trading_grid.infrastructure._common.ws_backoff.random.uniform", return_value=0.0
+        ):
             d0 = ws_reconnect_delay(0, base=2.0)
             d1 = ws_reconnect_delay(1, base=2.0)
         assert d0 == 2.0
@@ -52,7 +60,9 @@ class TestWsReconnectDelay:
 
     def test_custom_max_delay(self):
         """Custom max_delay should cap earlier."""
-        with patch("trading_grid.infrastructure._common.ws_backoff.random.uniform", return_value=0.0):
+        with patch(
+            "trading_grid.infrastructure._common.ws_backoff.random.uniform", return_value=0.0
+        ):
             d3 = ws_reconnect_delay(3, max_delay=5.0)
             d4 = ws_reconnect_delay(4, max_delay=5.0)
         assert d3 == 5.0
@@ -60,7 +70,9 @@ class TestWsReconnectDelay:
 
     def test_jitter_added(self):
         """Jitter should be added to the delay."""
-        with patch("trading_grid.infrastructure._common.ws_backoff.random.uniform", return_value=0.05):
+        with patch(
+            "trading_grid.infrastructure._common.ws_backoff.random.uniform", return_value=0.05
+        ):
             delay = ws_reconnect_delay(0)
         # base=1.0, jitter=0.05*1.0=0.05 → 1.05
         assert delay == 1.05

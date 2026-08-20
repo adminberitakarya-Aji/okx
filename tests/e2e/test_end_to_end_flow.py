@@ -39,7 +39,6 @@ DEMO_IDENTITY = Identity(
 )
 
 
-
 def _build_test_blueprint(market_id: str = "BTC-USDT") -> Blueprint:
     """Build a valid domain strategy blueprint for E2E testing."""
     levels = [
@@ -85,11 +84,17 @@ async def test_complete_e2e_research_to_execution_flow():
             last_price=Decimal("50000"),
         )
     )
-    mock_adapter.reconcile = AsyncMock(return_value={"reconciled_at": datetime.now(UTC).isoformat()})
+    mock_adapter.reconcile = AsyncMock(
+        return_value={"reconciled_at": datetime.now(UTC).isoformat()}
+    )
     mock_adapter.place_order = AsyncMock(return_value="EX-ORD-E2E-999")
     mock_adapter.cancel_order = AsyncMock(return_value=True)
-    mock_adapter.get_order_status = AsyncMock(return_value={"status": "FILLED", "fill_price": "50000"})
-    mock_adapter.get_balance = AsyncMock(return_value={"USDT": {"total": Decimal("10000"), "available": Decimal("10000")}})
+    mock_adapter.get_order_status = AsyncMock(
+        return_value={"status": "FILLED", "fill_price": "50000"}
+    )
+    mock_adapter.get_balance = AsyncMock(
+        return_value={"USDT": {"total": Decimal("10000"), "available": Decimal("10000")}}
+    )
     mock_adapter.get_positions = AsyncMock(return_value=[])
     mock_adapter.get_pending_orders = AsyncMock(return_value=[])
 
@@ -131,7 +136,8 @@ async def test_complete_e2e_research_to_execution_flow():
 
     # Start grid (Atomic transition to RUNNING + initial anchor order)
     started_session = await demo_service.start_demo_grid(
-        session.session_id, identity=owner_identity  # [A-H11] required
+        session.session_id,
+        identity=owner_identity,  # [A-H11] required
     )
     assert started_session.status == "RUNNING"
     assert started_session.started_at is not None
@@ -198,7 +204,7 @@ async def test_e2e_risk_fail_closed_prevents_unauthorized_exposure():
         side="BUY",
         quantity=Decimal("1.0"),
         price=Decimal("50000"),  # Notional: $50,000 > $100 limit
-    identity=DEMO_IDENTITY,  # [A-H12] required
+        identity=DEMO_IDENTITY,  # [A-H12] required
     )
 
     assert result.success is False

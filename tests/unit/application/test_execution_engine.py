@@ -169,7 +169,7 @@ class TestExecuteOrder:
             side="BUY",
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is True
@@ -189,7 +189,7 @@ class TestExecuteOrder:
             side="BUY",
             quantity=Decimal("0.01"),
             price=Decimal("49000"),
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is True
@@ -209,7 +209,7 @@ class TestExecuteOrder:
             side="SELL",
             quantity=Decimal("1"),
             reference_price=Decimal("3000"),
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         order = engine.get_order(result.order_id)
@@ -228,7 +228,7 @@ class TestExecuteOrder:
             side="BUY",
             quantity=Decimal("10"),
             price=Decimal("50000"),
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is False
@@ -253,7 +253,7 @@ class TestExecuteOrder:
             quantity=Decimal("0.5"),
             price=Decimal("48000"),
             reference_price=Decimal("48100"),
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         validator.validate_order.assert_called_once()
@@ -275,7 +275,7 @@ class TestExecuteOrder:
             side="BUY",
             quantity=Decimal("0.01"),
             price=Decimal("50000"),
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is True
@@ -292,7 +292,7 @@ class TestExecuteOrder:
             side="BUY",
             quantity=Decimal("0.01"),
             price=Decimal("50000"),
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         adapter.reconcile.assert_not_awaited()
@@ -311,7 +311,7 @@ class TestExecuteOrder:
             side="BUY",
             quantity=Decimal("0.01"),
             price=Decimal("50000"),
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is False
@@ -332,7 +332,7 @@ class TestExecuteOrder:
             side="BUY",
             quantity=Decimal("0.01"),
             price=Decimal("50000"),
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is False
@@ -353,7 +353,7 @@ class TestExecuteOrder:
             quantity=Decimal("5"),
             price=Decimal("150"),
             metadata={"grid_level": 3, "section_id": 1},
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         order = engine.get_order(result.order_id)
@@ -374,7 +374,7 @@ class TestExecuteOrder:
             side="BUY",
             quantity=Decimal("0.01"),
             price=Decimal("50000"),
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         order = engine.get_order(result.order_id)
@@ -542,7 +542,7 @@ class TestExecuteOrderTenantLimits:
             price=Decimal("50000"),
             user_id="usr_1",
             active_grid_count=2,
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         tenant_limits.check_can_trade.assert_called_once_with(
@@ -562,7 +562,7 @@ class TestExecuteOrderTenantLimits:
             side="BUY",
             quantity=Decimal("0.01"),
             price=Decimal("50000"),
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         tenant_limits.check_can_trade.assert_not_called()
@@ -583,7 +583,7 @@ class TestExecuteOrderTenantLimits:
                 side="BUY",
                 quantity=Decimal("0.01"),
                 price=Decimal("50000"),
-            identity=DEMO_IDENTITY,  # [A-H12] required
+                identity=DEMO_IDENTITY,  # [A-H12] required
             )
 
         # Order still succeeds (soft enforcement)
@@ -615,7 +615,7 @@ class TestExecuteOrderTenantLimits:
             quantity=Decimal("0.01"),
             price=Decimal("50000"),
             user_id="usr_1",
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is False
@@ -643,7 +643,7 @@ class TestExecuteOrderTenantLimits:
             quantity=Decimal("0.01"),
             price=Decimal("50000"),
             user_id="usr_1",
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is False
@@ -672,7 +672,7 @@ class TestExecuteOrderTenantLimits:
             price=Decimal("50000"),
             user_id="usr_1",
             active_grid_count=5,
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is False
@@ -697,7 +697,7 @@ class TestExecuteOrderTenantLimits:
             quantity=Decimal("0.01"),
             price=Decimal("50000"),
             user_id="usr_1",
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         # Both are called, but check_can_trade must be called first
@@ -720,7 +720,7 @@ class TestExecuteOrderTenantLimits:
             quantity=Decimal("0.01"),
             price=Decimal("50000"),
             user_id="usr_1",
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         tenant_limits.check_can_trade.assert_called_once()
@@ -745,7 +745,7 @@ class TestExecuteOrderTenantLimits:
             user_id="usr_1",
             active_grid_count=1,
             skip_rate_limit=True,
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is True
@@ -772,7 +772,7 @@ class TestExecuteOrderTenantLimits:
             price=Decimal("50000"),
             user_id="usr_1",
             skip_rate_limit=True,
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result.success is False
@@ -1319,7 +1319,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key=key,
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
         assert result1.success is True
 
@@ -1329,7 +1329,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key=key,
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
         assert result2.success is True
         assert result2.order_id == result1.order_id
@@ -1349,7 +1349,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key="GRID-1:0:3:BUY:100",
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
         result2 = await engine.execute_order(
             market_id="BTC-USDT",
@@ -1357,7 +1357,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key="GRID-1:0:4:BUY:100",
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result1.success is True
@@ -1376,14 +1376,14 @@ class TestIdempotency:
             side="BUY",
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
         result2 = await engine.execute_order(
             market_id="BTC-USDT",
             side="BUY",
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result1.success is True
@@ -1404,7 +1404,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key=key,
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         result2 = await engine.execute_order(
@@ -1413,7 +1413,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key=key,
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result2.exchange_order_id == result1.exchange_order_id
@@ -1434,7 +1434,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key=key,
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
         assert result1.success is False
 
@@ -1446,7 +1446,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key=key,
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
         assert result2.success is False
         # Both attempts should have been made (2 orders tracked)
@@ -1464,7 +1464,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key=key,
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         order = engine.get_order(result.order_id)
@@ -1489,7 +1489,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key=key,
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         found = engine._find_order_by_idempotency_key(key)
@@ -1509,7 +1509,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key=key,
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         # Manually set status to FILLED to simulate exchange fill
@@ -1522,7 +1522,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key=key,
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result2.success is True
@@ -1542,7 +1542,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key=key,
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         order = engine.get_order(result1.order_id)
@@ -1554,7 +1554,7 @@ class TestIdempotency:
             quantity=Decimal("0.01"),
             reference_price=Decimal("50000"),
             idempotency_key=key,
-        identity=DEMO_IDENTITY,  # [A-H12] required
+            identity=DEMO_IDENTITY,  # [A-H12] required
         )
 
         assert result2.success is True

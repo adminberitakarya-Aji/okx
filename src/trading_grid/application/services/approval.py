@@ -320,9 +320,7 @@ class ApprovalService:
             if (
                 approval.is_approved
                 and not approval.is_expired
-                and approval.matches_operation(
-                    operation_id, environment, market_id, blueprint_id
-                )
+                and approval.matches_operation(operation_id, environment, market_id, blueprint_id)
             ):
                 return True
         return False

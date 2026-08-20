@@ -145,9 +145,7 @@ class BybitAdapter(ExchangeAdapter):
         await self._rest.close()
         logger.info("bybit_adapter_disconnected")
 
-    async def start_market_data_ws(
-        self, market_ids: list[MarketId] | None = None
-    ) -> None:
+    async def start_market_data_ws(self, market_ids: list[MarketId] | None = None) -> None:
         """
         Start public WebSocket for market data.
 
@@ -213,9 +211,7 @@ class BybitAdapter(ExchangeAdapter):
             topics: List of topic names, e.g. ["order", "position", "wallet"]
         """
         if self._private_ws is None:
-            raise RuntimeError(
-                "Private WebSocket not initialized. Call start_private_ws() first."
-            )
+            raise RuntimeError("Private WebSocket not initialized. Call start_private_ws() first.")
         await self._private_ws._wait_for_connected()
         await self._private_ws.subscribe_many(topics)
         logger.info("bybit_subscribed_private", topics=len(topics))
@@ -455,7 +451,9 @@ class BybitAdapter(ExchangeAdapter):
 
                     if qty > 0 and asset not in quote_assets:
                         # [I-M6] Resolve quote currency dynamically
-                        quote_ccy = self._quote_currency_map.get(asset, self._default_quote_currency)
+                        quote_ccy = self._quote_currency_map.get(
+                            asset, self._default_quote_currency
+                        )
                         position = Position(
                             position_id=f"{asset}-spot",
                             market_id=f"{asset}-{quote_ccy}",

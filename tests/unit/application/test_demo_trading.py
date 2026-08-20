@@ -37,7 +37,6 @@ DEMO_IDENTITY = Identity(
 )
 
 
-
 def create_test_blueprint(
     market_id: str = "BTC-USDT",
     total_capital: Decimal = Decimal("1000"),

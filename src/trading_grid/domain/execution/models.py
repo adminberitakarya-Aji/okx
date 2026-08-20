@@ -137,7 +137,9 @@ class Fill:
     def effective_cost(self) -> Decimal:
         """Calculate effective cost in quote currency including fees."""
         # Convert base currency fee (e.g. BTC on BTC-USDT) to quote notional
-        market_parts = self.market_id.split("-") if "-" in self.market_id else self.market_id.split("/")
+        market_parts = (
+            self.market_id.split("-") if "-" in self.market_id else self.market_id.split("/")
+        )
         base_asset = market_parts[0] if market_parts else ""
         if self.fee_currency and self.fee_currency == base_asset:
             fee_in_quote = self.fee * self.price

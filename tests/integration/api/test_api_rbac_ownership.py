@@ -551,9 +551,9 @@ class TestBlueprintGenerationOwnership:
         assert response.status_code == 201
 
         # Verify the service was called with the correct user_id
-        call_kwargs = (
-            multi.default_container.research_service.generate_default_blueprint.call_args[1]
-        )
+        call_kwargs = multi.default_container.research_service.generate_default_blueprint.call_args[
+            1
+        ]
         assert call_kwargs["user_id"] == "dev-operator"
 
 

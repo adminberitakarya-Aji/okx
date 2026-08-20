@@ -408,8 +408,7 @@ class CausalIntegrityValidator:
                 label_start = self._normalize_tz(label_start)
                 if label_start < obs_ts:
                     violations.append(
-                        f"Label start {label_start} is before observation "
-                        f"timestamp {obs_ts}"
+                        f"Label start {label_start} is before observation timestamp {obs_ts}"
                     )
 
         return violations

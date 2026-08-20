@@ -144,7 +144,8 @@ async def get_ml_status(
 
     return MLModelStatusResponse(
         ml_available=status.get("ml_available", False),
-        ranking_mode=status.get("last_ranking_mode") or ("ml" if status.get("ml_available") else "heuristic"),
+        ranking_mode=status.get("last_ranking_mode")
+        or ("ml" if status.get("ml_available") else "heuristic"),
         models_loaded=status.get("ml_models_loaded", 0),
         active_models=active_models,
         last_ranking_at=_parse_iso_datetime(status.get("last_ranking_at")),

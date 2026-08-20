@@ -438,7 +438,9 @@ class ResearchService:
                     logger.warning("ml_prediction_failed", market_id=market_id, error=str(e))
                     return None
 
-        results = await asyncio.gather(*[_predict_market(m) for m in market_ids], return_exceptions=False)
+        results = await asyncio.gather(
+            *[_predict_market(m) for m in market_ids], return_exceptions=False
+        )
         return [r for r in results if r is not None]
 
     async def rank_markets(
@@ -533,13 +535,17 @@ class ResearchService:
                     if ticker:
                         # Estimate volatility from bid-ask spread
                         if ticker.bid_price and ticker.ask_price and ticker.bid_price > 0:
-                            spread_pct = float((ticker.ask_price - ticker.bid_price) / ticker.bid_price)
+                            spread_pct = float(
+                                (ticker.ask_price - ticker.bid_price) / ticker.bid_price
+                            )
                             # Lower spread = more liquid = better for grid
                             volume_score = max(0.0, min(1.0, 1.0 - spread_pct * 100))
 
                         # Use 24h high vs last price as volatility proxy
                         if ticker.high_24h and ticker.last_price > 0:
-                            volatility = abs(float((ticker.high_24h - ticker.last_price) / ticker.last_price))
+                            volatility = abs(
+                                float((ticker.high_24h - ticker.last_price) / ticker.last_price)
+                            )
                 except Exception:
                     logger.debug("heuristic_market_data_failed", market_id=market_id)
 

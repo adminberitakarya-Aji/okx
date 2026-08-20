@@ -88,7 +88,9 @@ class TestBinanceAdapterWebSocket:
     async def test_subscribe_market_ids_sends_correct_streams(self):
         """[NEW-CR-1] subscribe_market_ids() must build @ticker and @kline_1h streams."""
         adapter = _make_adapter()
-        with patch("trading_grid.infrastructure.binance.adapter.BinanceWebSocketClient") as mock_ws_cls:
+        with patch(
+            "trading_grid.infrastructure.binance.adapter.BinanceWebSocketClient"
+        ) as mock_ws_cls:
             mock_ws = AsyncMock()
             mock_ws_cls.return_value = mock_ws
 

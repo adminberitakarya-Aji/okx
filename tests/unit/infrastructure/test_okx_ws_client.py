@@ -466,11 +466,14 @@ class TestScheduleReconnect:
 
         fake_ws._recv = recv
 
-        with patch(
-            "trading_grid.infrastructure.okx.websocket_client.websockets.connect",
-            new_callable=AsyncMock,
-            return_value=fake_ws,
-        ), patch.object(client, "_message_loop", new_callable=AsyncMock):
+        with (
+            patch(
+                "trading_grid.infrastructure.okx.websocket_client.websockets.connect",
+                new_callable=AsyncMock,
+                return_value=fake_ws,
+            ),
+            patch.object(client, "_message_loop", new_callable=AsyncMock),
+        ):
             await client._connect()
 
         assert client._reconnect_attempt == 0

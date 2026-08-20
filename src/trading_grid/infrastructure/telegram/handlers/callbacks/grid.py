@@ -178,11 +178,17 @@ async def callback_grid_orders_all(callback: CallbackQuery) -> None:
     else:
         for session in sessions[:5]:
             grid_id = session.grid_runtime.grid_id
-            orders = session.grid_runtime.order_history[-5:] if session.grid_runtime.order_history else []
+            orders = (
+                session.grid_runtime.order_history[-5:]
+                if session.grid_runtime.order_history
+                else []
+            )
             lines.append(f"<b>Grid {grid_id}:</b>")
             if orders:
                 for order in orders:
-                    lines.append(f"  • {order.side} {order.quantity} @ {order.price} [{order.status}]")
+                    lines.append(
+                        f"  • {order.side} {order.quantity} @ {order.price} [{order.status}]"
+                    )
             else:
                 lines.append("  No orders yet.")
             lines.append("")
@@ -210,7 +216,11 @@ async def callback_grid_pnl_all(callback: CallbackQuery) -> None:
         lines.append("No active grids.")
     else:
         total_pnl = sum(
-            (s.grid_runtime.realized_pnl for s in sessions if s.grid_runtime.realized_pnl is not None),
+            (
+                s.grid_runtime.realized_pnl
+                for s in sessions
+                if s.grid_runtime.realized_pnl is not None
+            ),
             start=0,
         )
         for session in sessions:
@@ -263,8 +273,7 @@ async def callback_grid_orders_detail(callback: CallbackQuery) -> None:
         return
 
     session = next(
-        (s for s in container.demo_service.active_sessions
-         if s.grid_runtime.grid_id == grid_id),
+        (s for s in container.demo_service.active_sessions if s.grid_runtime.grid_id == grid_id),
         None,
     )
 
@@ -299,8 +308,7 @@ async def callback_grid_pnl_detail(callback: CallbackQuery) -> None:
         return
 
     session = next(
-        (s for s in container.demo_service.active_sessions
-         if s.grid_runtime.grid_id == grid_id),
+        (s for s in container.demo_service.active_sessions if s.grid_runtime.grid_id == grid_id),
         None,
     )
 

@@ -246,8 +246,7 @@ async def _admin_retrain(message: Message) -> None:
     running = [t for t in _training_tasks.values() if not t.done()]
     if running:
         await message.answer(
-            "⚠️ A training run is already in progress.\n"
-            "Please wait for it to complete.",
+            "⚠️ A training run is already in progress.\nPlease wait for it to complete.",
         )
         return
 

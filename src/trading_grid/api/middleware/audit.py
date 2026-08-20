@@ -171,5 +171,3 @@ async def _persist_audit_record(
     except Exception as e:
         # Audit logging must never break the request pipeline
         logger.warning("audit_db_persist_failed", error=str(e), action=action)
-
-

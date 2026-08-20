@@ -583,4 +583,3 @@ def get_settings() -> Settings:
 def clear_settings_cache() -> None:
     """Clear the cached settings instance for test isolation."""
     get_settings.cache_clear()
-

@@ -348,11 +348,7 @@ class TenantLimitsService:
             return 0
 
         active_grids = self._grid_engine.get_active_grids()
-        count = sum(
-            1
-            for grid in active_grids
-            if getattr(grid, "user_id", None) == user_id
-        )
+        count = sum(1 for grid in active_grids if getattr(grid, "user_id", None) == user_id)
         return count
 
     # =========================================================================

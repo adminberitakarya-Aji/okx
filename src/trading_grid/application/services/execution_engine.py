@@ -470,7 +470,9 @@ class ExecutionEngine:
             return False
 
         if not order.is_active:
-            logger.info("cancel_order_not_active", order_id=order_id, status=order.status, user_id=user_id)
+            logger.info(
+                "cancel_order_not_active", order_id=order_id, status=order.status, user_id=user_id
+            )
             return False
 
         success = await self._adapter.cancel_order(order.market_id, order.exchange_order_id)
@@ -544,10 +546,12 @@ class ExecutionEngine:
         # Update order states for active orders concurrently
         active_orders = [o for o in self.get_active_orders() if o.exchange_order_id]
         if active_orders:
+
             async def _check_order_status(ord_obj: Order) -> None:
                 try:
                     status_data = await self._adapter.get_order_status(
-                        ord_obj.market_id, ord_obj.exchange_order_id  # type: ignore[arg-type]
+                        ord_obj.market_id,
+                        ord_obj.exchange_order_id,  # type: ignore[arg-type]
                     )
                     self._update_order_from_exchange(ord_obj, status_data)
                 except Exception as e:
@@ -557,7 +561,9 @@ class ExecutionEngine:
                         error=str(e),
                     )
 
-            await asyncio.gather(*[_check_order_status(o) for o in active_orders], return_exceptions=True)
+            await asyncio.gather(
+                *[_check_order_status(o) for o in active_orders], return_exceptions=True
+            )
 
         result = {
             "adapter": adapter_result,

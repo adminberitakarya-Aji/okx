@@ -360,9 +360,7 @@ class OKXWebSocketClient:
         # Remove from tracking
         to_remove = {json.dumps(c, sort_keys=True) for c in channels}
         self._subscribed_channels = [
-            c
-            for c in self._subscribed_channels
-            if json.dumps(c, sort_keys=True) not in to_remove
+            c for c in self._subscribed_channels if json.dumps(c, sort_keys=True) not in to_remove
         ]
         logger.info("ws_unsubscribed", count=len(channels))
 

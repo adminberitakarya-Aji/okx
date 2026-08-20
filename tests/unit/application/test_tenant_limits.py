@@ -359,9 +359,7 @@ class TestGridEngineAutoFetch:
         assert service.get_active_grid_count("usr_2") == 1
         assert service.get_active_grid_count("usr_3") == 0
 
-    def test_get_active_grid_count_fallback_without_engine(
-        self, settings: Settings
-    ) -> None:
+    def test_get_active_grid_count_fallback_without_engine(self, settings: Settings) -> None:
         """get_active_grid_count uses internal tracking without GridEngine."""
         service = TenantLimitsService(settings)
 
@@ -393,9 +391,7 @@ class TestGridEngineAutoFetch:
         with pytest.raises(MaxGridsExceededError):
             service.check_can_trade("usr_1", now=0.0)
 
-    def test_check_can_trade_explicit_count_overrides_auto_fetch(
-        self, settings: Settings
-    ) -> None:
+    def test_check_can_trade_explicit_count_overrides_auto_fetch(self, settings: Settings) -> None:
         """Explicit active_grid_count takes precedence over auto-fetch."""
         grids = [self._make_mock_grid("usr_1")]  # 1 grid in engine
         engine = self._make_mock_engine(grids)
@@ -417,4 +413,3 @@ class TestGridEngineAutoFetch:
 
         # usr_1 only has 1 grid (system grids not counted)
         assert service.get_active_grid_count("usr_1") == 1
-

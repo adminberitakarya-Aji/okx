@@ -289,9 +289,7 @@ async def cmd_account(message: Message) -> None:
             continue
 
         try:
-            integration = await _user_service.get_exchange_integration(
-                user.user_id, exchange_id
-            )
+            integration = await _user_service.get_exchange_integration(user.user_id, exchange_id)
             if integration is not None:
                 any_connected = True
                 status_icon = "🟢" if integration.status == "VERIFIED" else "🟡"

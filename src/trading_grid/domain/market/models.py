@@ -313,7 +313,14 @@ class MarketState:
     def __post_init__(self) -> None:
         """Validate market state regime."""
         if self.regime is not None:
-            valid_regimes = ("RANGING", "TRENDING_UP", "TRENDING_DOWN", "VOLATILE", "BREAKOUT", "UNKNOWN")
+            valid_regimes = (
+                "RANGING",
+                "TRENDING_UP",
+                "TRENDING_DOWN",
+                "VOLATILE",
+                "BREAKOUT",
+                "UNKNOWN",
+            )
             if self.regime not in valid_regimes:
                 raise ValueError(
                     f"Invalid market regime: '{self.regime}'. Must be one of {valid_regimes}"

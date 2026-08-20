@@ -91,7 +91,6 @@ class TestBlueprintOwnership:
         )
         assert blueprint.user_id is None
 
-
     def test_blueprint_user_id_can_be_set(self) -> None:
         """Blueprint user_id can be set to an owner identity."""
         blueprint = Blueprint(
@@ -348,7 +347,9 @@ class TestBlueprintGenerationOwnership:
 
         # Create service without adapter (will use defaults)
         with patch.object(ResearchService, "_load_deployed_models"):
-            service = ResearchService(adapter=None, model_dir="models", registry_dir="models/registry")
+            service = ResearchService(
+                adapter=None, model_dir="models", registry_dir="models/registry"
+            )
 
         blueprint = service.generate_default_blueprint(
             market_id="BTC-USDT",
@@ -365,7 +366,9 @@ class TestBlueprintGenerationOwnership:
         from trading_grid.application.services.research_service import ResearchService
 
         with patch.object(ResearchService, "_load_deployed_models"):
-            service = ResearchService(adapter=None, model_dir="models", registry_dir="models/registry")
+            service = ResearchService(
+                adapter=None, model_dir="models", registry_dir="models/registry"
+            )
 
         blueprint = service.generate_default_blueprint(
             market_id="ETH-USDT",

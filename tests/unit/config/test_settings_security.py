@@ -38,9 +38,7 @@ def make_settings(
 ) -> Settings:
     """Build a Settings instance for testing."""
     # [NEW-CR-2] Production requires a strong secret_key; tests must pass one.
-    secret_key = (
-        secrets.token_urlsafe(64) if env == "production" else None
-    )
+    secret_key = secrets.token_urlsafe(64) if env == "production" else None
     app_kwargs: dict = {"env": env, "_env_file": None}
     if secret_key:
         app_kwargs["secret_key"] = secret_key
@@ -77,7 +75,9 @@ def make_settings(
         else BybitSettings(testnet_mode=bybit_testnet, _env_file=None)
     )
     telegram = TelegramSettings(open_access=False, _env_file=None)
-    return Settings(app=app, okx=okx, binance=binance, bybit=bybit, telegram=telegram, _env_file=None)
+    return Settings(
+        app=app, okx=okx, binance=binance, bybit=bybit, telegram=telegram, _env_file=None
+    )
 
 
 class TestExchangeSecurityValidator:
@@ -283,9 +283,7 @@ class TestTelegramOpenAccessProductionValidator:
         """TELEGRAM_OPEN_ACCESS=True in production raises ValueError."""
         # [NEW-CR-2] Provide strong secret_key so the AppSettings validator
         # does not pre-empt the open_access check we are testing.
-        app = AppSettings(
-            env="production", secret_key=secrets.token_urlsafe(64), _env_file=None
-        )
+        app = AppSettings(env="production", secret_key=secrets.token_urlsafe(64), _env_file=None)
         telegram = TelegramSettings(open_access=True, _env_file=None)
         with pytest.raises(ValueError, match="TELEGRAM_OPEN_ACCESS cannot be True in production"):
             Settings(app=app, telegram=telegram, _env_file=None)

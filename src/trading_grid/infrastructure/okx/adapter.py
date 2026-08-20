@@ -93,9 +93,7 @@ class OKXAdapter(ExchangeAdapter):
         await self._rest.close()
         logger.info("okx_adapter_disconnected")
 
-    async def start_market_data_ws(
-        self, market_ids: list[MarketId] | None = None
-    ) -> None:
+    async def start_market_data_ws(self, market_ids: list[MarketId] | None = None) -> None:
         """
         Start public WebSocket for market data.
 
@@ -160,9 +158,7 @@ class OKXAdapter(ExchangeAdapter):
             channels: List of channel names, e.g. ["orders", "account", "positions"]
         """
         if self._private_ws is None:
-            raise RuntimeError(
-                "Private WebSocket not initialized. Call start_private_ws() first."
-            )
+            raise RuntimeError("Private WebSocket not initialized. Call start_private_ws() first.")
         await self._private_ws._wait_for_connected()
         await self._private_ws.subscribe_many([{"channel": c} for c in channels])
         logger.info("okx_subscribed_private", channels=len(channels))

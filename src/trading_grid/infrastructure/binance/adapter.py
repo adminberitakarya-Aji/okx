@@ -130,9 +130,7 @@ class BinanceAdapter(ExchangeAdapter):
         await self._rest.close()
         logger.info("binance_adapter_disconnected")
 
-    async def start_market_data_ws(
-        self, market_ids: list[MarketId] | None = None
-    ) -> None:
+    async def start_market_data_ws(self, market_ids: list[MarketId] | None = None) -> None:
         """
         Start public WebSocket for market data.
 

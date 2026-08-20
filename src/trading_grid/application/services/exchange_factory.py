@@ -414,8 +414,7 @@ def get_factory() -> ExchangeAdapterFactory:
     """
     if _factory_instance is None:
         raise RuntimeError(
-            "ExchangeAdapterFactory not initialized. "
-            "Call set_factory() at composition root first."
+            "ExchangeAdapterFactory not initialized. Call set_factory() at composition root first."
         )
     return _factory_instance
 

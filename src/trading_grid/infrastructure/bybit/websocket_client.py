@@ -329,9 +329,7 @@ class BybitWebSocketClient:
         await self._ws.send(json.dumps(message))
 
         # Remove from tracking
-        self._subscribed_topics = [
-            t for t in self._subscribed_topics if t not in topics
-        ]
+        self._subscribed_topics = [t for t in self._subscribed_topics if t not in topics]
         logger.info("bybit_ws_unsubscribed", count=len(topics))
 
     async def disconnect(self) -> None:

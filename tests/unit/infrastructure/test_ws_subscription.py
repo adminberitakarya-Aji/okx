@@ -182,10 +182,12 @@ class TestOKXUnsubscribe:
 class TestOKXWaitForConnected:
     async def test_wait_for_connected_success(self):
         client = OKXWebSocketClient(_okx_settings(), private=False)
+
         # Set the event in background after small delay
         async def setter():
             await asyncio.sleep(0.01)
             client._connected.set()
+
         task = asyncio.create_task(setter())
         await client._wait_for_connected(timeout=1.0)  # should succeed
         await task
@@ -305,9 +307,11 @@ class TestBinanceUnsubscribe:
 class TestBinanceWaitAndResubscribe:
     async def test_wait_for_connected_success(self):
         client = BinanceWebSocketClient(_binance_settings(), private=False)
+
         async def setter():
             await asyncio.sleep(0.01)
             client._connected.set()
+
         task = asyncio.create_task(setter())
         await client._wait_for_connected(timeout=1.0)
         await task

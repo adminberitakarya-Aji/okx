@@ -337,9 +337,7 @@ class BinanceWebSocketClient:
         await self._ws.send(json.dumps(msg))
 
         # Remove from tracking
-        self._subscribed_streams = [
-            s for s in self._subscribed_streams if s not in streams
-        ]
+        self._subscribed_streams = [s for s in self._subscribed_streams if s not in streams]
         logger.info("binance_ws_unsubscribed", count=len(streams))
 
     async def disconnect(self) -> None:

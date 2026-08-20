@@ -431,8 +431,12 @@ class ModelTrainer:
 
             # Train model for this fold with validation set for calibration
             fold_model = self.train(
-                X_train, y_train, X_val=X_val, y_val=y_val,
-                config=config, feature_names=feature_names,
+                X_train,
+                y_train,
+                X_val=X_val,
+                y_val=y_val,
+                config=config,
+                feature_names=feature_names,
             )
 
             if fold_model.status == ModelStatus.FAILED:

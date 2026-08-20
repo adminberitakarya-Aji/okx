@@ -40,7 +40,9 @@ async def readiness_check() -> ReadinessResponse:
     checks = {
         "api": True,
         "database": True,
-        "exchange_configured": settings.okx.is_configured or settings.binance.is_configured or settings.bybit.is_configured,
+        "exchange_configured": settings.okx.is_configured
+        or settings.binance.is_configured
+        or settings.bybit.is_configured,
     }
 
     all_ready = all(checks.values())

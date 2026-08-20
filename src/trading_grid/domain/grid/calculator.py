@@ -126,7 +126,9 @@ def calculate_section_prices(
             raise BlueprintValidationError(
                 f"Section {section.section_id}: calculated lowest geometric price ({prices[-1]}) "
                 f"breaches lower price boundary ({section.lower_price})",
-                errors=[f"Section {section.section_id}: lowest price {prices[-1]} < lower_price {section.lower_price}"],
+                errors=[
+                    f"Section {section.section_id}: lowest price {prices[-1]} < lower_price {section.lower_price}"
+                ],
             )
 
     elif spacing_mode == "arithmetic":
@@ -219,7 +221,9 @@ def validate_blueprint(blueprint: Blueprint) -> list[str]:
 
         # Check geometric decay lower price boundary [D-H2]
         if section.grid_count > 1:
-            decay_factor = (Decimal("1") - (section.grid_spacing_pct / Decimal("100"))) ** (section.grid_count - 1)
+            decay_factor = (Decimal("1") - (section.grid_spacing_pct / Decimal("100"))) ** (
+                section.grid_count - 1
+            )
             lowest_geometric = section.upper_price * decay_factor
             if lowest_geometric < section.lower_price:
                 errors.append(

@@ -248,7 +248,8 @@ async def start_grid(
             user_id=identity.identity_id,  # [A-H11] Set session owner
         )
         session = await container.demo_service.start_demo_grid(
-            session.session_id, identity=identity  # [A-H11] pass authenticated identity
+            session.session_id,
+            identity=identity,  # [A-H11] pass authenticated identity
         )
     except Exception as e:
         logger.error("grid_start_failed", blueprint_id=request.blueprint_id, error=str(e))

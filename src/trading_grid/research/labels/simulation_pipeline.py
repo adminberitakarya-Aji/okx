@@ -366,13 +366,15 @@ class SimulationLabelPipeline:
 
         import hashlib
 
-        payload = "|".join([
-            SIMULATION_PIPELINE_VERSION,
-            ",".join(sorted(market_ids)),
-            interval,
-            self.config.horizon,
-            str(self.config.observation_stride),
-        ])
+        payload = "|".join(
+            [
+                SIMULATION_PIPELINE_VERSION,
+                ",".join(sorted(market_ids)),
+                interval,
+                self.config.horizon,
+                str(self.config.observation_stride),
+            ]
+        )
         digest = hashlib.sha256(payload.encode()).hexdigest()[:12]
         return f"universe-{digest}"
 
