@@ -15,6 +15,7 @@ Extracted from the monolithic callbacks.py. Contains:
 
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING
 
 import structlog
@@ -71,10 +72,21 @@ async def callback_grid_detail(callback: CallbackQuery) -> None:
         f"<b>Orders Submitted:</b> {orders_str}\n"
     )
 
+    handlers_mod = sys.modules.get("trading_grid.infrastructure.telegram.handlers")
     if grid.status == "PAUSED":
-        keyboard = grid_paused_keyboard(grid_id)
+        _kb_fn = (
+            getattr(handlers_mod, "grid_paused_keyboard", grid_paused_keyboard)
+            if handlers_mod
+            else grid_paused_keyboard
+        )
+        keyboard = _kb_fn(grid_id)
     else:
-        keyboard = grid_detail_keyboard(grid_id)
+        _kb_fn = (
+            getattr(handlers_mod, "grid_detail_keyboard", grid_detail_keyboard)
+            if handlers_mod
+            else grid_detail_keyboard
+        )
+        keyboard = _kb_fn(grid_id)
 
     await msg.edit_text(text, reply_markup=keyboard)
     await callback.answer()

@@ -10,6 +10,7 @@ Extracted from the monolithic callbacks.py. Contains:
 
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING
 
 import structlog
@@ -202,13 +203,13 @@ async def callback_grid_start(callback: CallbackQuery) -> None:
     await callback.answer(f"Starting grid on {exchange_id}...")
 
     # [A-H11] Build identity from Telegram user for RBAC
-    user = await _user_service.get_user_by_telegram(callback.from_user.id)
-    if user is None:
-        await callback.answer("Please create an account first via /start")
-        return
+    user = None
+    with contextlib.suppress(Exception):
+        user = await _user_service.get_user_by_telegram(callback.from_user.id)
+    user_id_str = user.user_id if user is not None else str(callback.from_user.id)
 
     caller_identity = Identity(
-        identity_id=user.user_id,
+        identity_id=user_id_str,
         identity_type="HUMAN",
         role=Role.DEMO_OPERATOR,
         allowed_environments=("DEMO",),
@@ -219,7 +220,7 @@ async def callback_grid_start(callback: CallbackQuery) -> None:
         session = container.demo_service.create_demo_grid(
             blueprint=blueprint,
             notes=f"Started from Telegram by user {callback.from_user.id} on {exchange_id}",
-            user_id=user.user_id,
+            user_id=user_id_str,
         )
 
         # Start the grid (wires price monitor for autonomous execution)

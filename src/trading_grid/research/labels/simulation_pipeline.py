@@ -569,7 +569,9 @@ class SimulationLabelPipeline:
         sim_result = simulator.run(blueprint, future_candles)
 
         # Generate labels from simulation result
-        assert self.label_generator is not None, "LabelGenerator not initialized — call _initialize_label_generator first"
+        assert self.label_generator is not None, (
+            "LabelGenerator not initialized — call _initialize_label_generator first"
+        )
         label_set = self.label_generator.generate_from_simulation(
             sim_result,
             horizon=self.config.horizon,

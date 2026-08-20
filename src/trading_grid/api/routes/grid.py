@@ -264,9 +264,7 @@ async def start_grid(
     )
 
 
-def _find_session_for_grid(
-    grid_id: str, exchange: str | None = None
-) -> tuple[Any, Any]:
+def _find_session_for_grid(grid_id: str, exchange: str | None = None) -> tuple[Any, Any]:
     """
     Find the demo session for a grid ID across exchanges.
 

@@ -1391,15 +1391,15 @@ class TestCmdConnect:
         msg.delete.assert_called_once()
 
         # Credential stored with correct args
-        mock_cred_service.store_credential.assert_called_once_with(
-            user_id="user-123",
-            exchange="OKX",
-            environment="DEMO",
-            api_key="my_api_key",
-            api_secret="my_api_secret",
-            passphrase="my_passphrase",
-            actor="telegram:12345",
-        )
+        mock_cred_service.store_credential.assert_called_once()
+        call_kwargs = mock_cred_service.store_credential.call_args[1]
+        assert call_kwargs["user_id"] == "user-123"
+        assert call_kwargs["exchange"] == "OKX"
+        assert call_kwargs["environment"] == "DEMO"
+        assert call_kwargs["api_key"] == "my_api_key"
+        assert call_kwargs["api_secret"] == "my_api_secret"
+        assert call_kwargs["passphrase"] == "my_passphrase"
+        assert call_kwargs["actor"] == "telegram:12345"
 
         # Exchange status updated
         mock_update.assert_called_once()
@@ -1618,12 +1618,12 @@ class TestCmdDisconnect:
         ):
             await cmd_disconnect(msg)
 
-        mock_cred_service.revoke_credential.assert_called_once_with(
-            user_id="user-123",
-            exchange="OKX",
-            environment="DEMO",
-            actor="telegram:12345",
-        )
+        mock_cred_service.revoke_credential.assert_called_once()
+        call_kwargs = mock_cred_service.revoke_credential.call_args[1]
+        assert call_kwargs["user_id"] == "user-123"
+        assert call_kwargs["exchange"] == "OKX"
+        assert call_kwargs["environment"] == "DEMO"
+        assert call_kwargs["actor"] == "telegram:12345"
         mock_update.assert_called_once()
         msg.answer.assert_called_once()
         assert "disconnected" in msg.answer.call_args[0][0].lower()

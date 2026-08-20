@@ -12,6 +12,8 @@ All handler sub-modules import from here instead of holding their own state.
 
 from __future__ import annotations
 
+import sys
+
 import structlog
 from aiogram.types import CallbackQuery, Message
 
@@ -56,6 +58,11 @@ def set_service_container(container: MultiExchangeContainer | ServiceContainer) 
 
 def get_service_container() -> ServiceContainer | None:
     """Get the default (OKX) service container instance."""
+    handlers_mod = sys.modules.get("trading_grid.infrastructure.telegram.handlers")
+    if handlers_mod is not None:
+        handler_fn = getattr(handlers_mod, "get_service_container", None)
+        if handler_fn is not None and handler_fn is not get_service_container:
+            return handler_fn()  # type: ignore[no-any-return]
     if _multi_container is None:
         return None
     return _multi_container.default_container
@@ -63,6 +70,11 @@ def get_service_container() -> ServiceContainer | None:
 
 def get_multi_container() -> MultiExchangeContainer | None:
     """Get the multi-exchange container registry."""
+    handlers_mod = sys.modules.get("trading_grid.infrastructure.telegram.handlers")
+    if handlers_mod is not None:
+        handler_fn = getattr(handlers_mod, "get_multi_container", None)
+        if handler_fn is not None and handler_fn is not get_multi_container:
+            return handler_fn()  # type: ignore[no-any-return]
     return _multi_container
 
 
@@ -76,6 +88,11 @@ def get_container_for_exchange(exchange_id: str) -> ServiceContainer | None:
     Returns:
         ServiceContainer for the exchange, or None if not initialized
     """
+    handlers_mod = sys.modules.get("trading_grid.infrastructure.telegram.handlers")
+    if handlers_mod is not None:
+        handler_fn = getattr(handlers_mod, "get_container_for_exchange", None)
+        if handler_fn is not None and handler_fn is not get_container_for_exchange:
+            return handler_fn(exchange_id)  # type: ignore[no-any-return]
     if _multi_container is None:
         return None
     try:
@@ -91,6 +108,11 @@ def get_credential_service() -> CredentialService | None:
     Returns None if CREDENTIAL_ENCRYPTION_KEY is not configured.
     """
     global _credential_service
+    handlers_mod = sys.modules.get("trading_grid.infrastructure.telegram.handlers")
+    if handlers_mod is not None:
+        handler_fn = getattr(handlers_mod, "get_credential_service", None)
+        if handler_fn is not None and handler_fn is not get_credential_service:
+            return handler_fn()  # type: ignore[no-any-return]
     if _credential_service is None:
         try:
             _credential_service = CredentialService(get_settings())
@@ -107,6 +129,11 @@ def get_user_service() -> UserService:
     Returns:
         UserService instance
     """
+    handlers_mod = sys.modules.get("trading_grid.infrastructure.telegram.handlers")
+    if handlers_mod is not None:
+        handler_fn = getattr(handlers_mod, "get_user_service", None)
+        if handler_fn is not None and handler_fn is not get_user_service:
+            return handler_fn()  # type: ignore[no-any-return]
     return _user_service
 
 

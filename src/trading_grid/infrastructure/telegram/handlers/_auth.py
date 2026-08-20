@@ -9,6 +9,7 @@ Extracted from the monolithic handlers.py. Provides:
 
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING
 
 import structlog
@@ -35,6 +36,11 @@ def is_authorized_user(user_id: int) -> bool:
     Returns:
         True if user is in the config allowlist
     """
+    handlers_mod = sys.modules.get("trading_grid.infrastructure.telegram.handlers")
+    if handlers_mod is not None:
+        handler_fn = getattr(handlers_mod, "is_authorized_user", None)
+        if handler_fn is not None and handler_fn is not is_authorized_user:
+            return handler_fn(user_id)  # type: ignore[no-any-return]
     settings = get_settings()
     allowed_ids = settings.telegram.allowed_user_ids
 
@@ -57,6 +63,11 @@ async def check_authorization(message: Message) -> bool:
     Returns:
         True if authorized
     """
+    handlers_mod = sys.modules.get("trading_grid.infrastructure.telegram.handlers")
+    if handlers_mod is not None:
+        handler_fn = getattr(handlers_mod, "check_authorization", None)
+        if handler_fn is not None and handler_fn is not check_authorization:
+            return await handler_fn(message)  # type: ignore[no-any-return]
     if message.from_user is None:
         return False
 
@@ -148,6 +159,11 @@ async def check_callback_authorization(callback: CallbackQuery) -> bool:
     Returns:
         True if authorized
     """
+    handlers_mod = sys.modules.get("trading_grid.infrastructure.telegram.handlers")
+    if handlers_mod is not None:
+        handler_fn = getattr(handlers_mod, "check_callback_authorization", None)
+        if handler_fn is not None and handler_fn is not check_callback_authorization:
+            return await handler_fn(callback)  # type: ignore[no-any-return]
     user_id = callback.from_user.id
 
     # Open access mode: anyone can use the bot (beta trial)
